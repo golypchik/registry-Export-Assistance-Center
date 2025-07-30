@@ -1,19 +1,15 @@
-from django.db import models
-from django.utils import timezone
-from dateutil.relativedelta import relativedelta
-from django.utils.safestring import mark_safe
-from django.db.models.signals import pre_delete
-from django.dispatch import receiver
+
+from django.conf import settings
 import os
 import logging
-import pandas as pd
-from django.utils.functional import cached_property
+from django.db import models
 from django.core.exceptions import ValidationError
-from django.urls import reverse
-from django.conf import settings
-from django.core.files.base import ContentFile
-import qrcode
-from io import BytesIO
+from django.utils import timezone
+from django.utils.functional import cached_property
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
+from dateutil.relativedelta import relativedelta
+
 logger = logging.getLogger(__name__)
 
 class ISOStandard(models.Model):
@@ -230,7 +226,7 @@ class Certificate(models.Model):
                 logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
                 
                 # Если логотип не имеет альфа-канала, добавляем его
-                if logo.mode != 'RGBA':New-Item -Path ".gitignore" -ItemType File
+                if logo.mode != 'RGBA':
                     logo = logo.convert('RGBA')
                 
                 # Создаем белый квадратный фон для логотипа
