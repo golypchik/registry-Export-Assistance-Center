@@ -63,20 +63,19 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'cert_checker.wsgi.application'
 
+# Database configuration for Render
 if 'DATABASE_URL' in os.environ:
-    # Production database (PostgreSQL on Render)
     DATABASES = {
         'default': dj_database_url.parse(os.environ.get('DATABASE_URL'))
     }
 else:
-    # Development database (SQLite)
+    # Local development database
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -101,21 +100,21 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
+# Static files configuration for Render
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
-# Путь к статическим файлам приложения
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'certificates', 'static'),
 ]
 
-# WhiteNoise для обслуживания статических файлов
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
-# Настройки медиа-файлов
+# Media files configuration
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Security settings for production
+if not config('DEBUG', default=True, cast=bool):
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
