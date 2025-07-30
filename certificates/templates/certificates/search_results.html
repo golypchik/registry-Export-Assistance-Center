@@ -1,0 +1,315 @@
+{% extends 'certificates/base.html' %}
+{% load static %}
+{% load certificate_filters %}
+
+{% block title %}Результаты поиска{% endblock %}
+
+{% block content %}
+<style>
+    .certificate-thumbnail {
+        display: inline-block;
+        margin-right: 10px;
+        margin-bottom: 10px;
+        text-align: center;
+    }
+    
+    .certificate-preview {
+        transition: transform 0.2s;
+    }
+    
+    .certificate-preview:hover {
+        transform: scale(1.05);
+    }
+    
+    .modal-xl {
+        max-width: 90%;
+    }
+    
+    /* Добавляем стили для изображений в модальных окнах */
+    .modal-body img.img-fluid {
+        max-height: 90vh; /* 90% высоты экрана */
+        max-width: 100%;
+        object-fit: contain;
+        margin: 0 auto;
+        display: block;
+    }
+    
+    /* Стили для PDF в модальных окнах */
+    .modal-body iframe {
+        height: 90vh; /* 90% высоты экрана */
+        width: 100%;
+    }
+</style>
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-8 offset-md-2 text-center">
+            <div class="d-flex justify-content-center align-items-center mb-4">
+                <img src="{% static 'certificates/img/logo1.png' %}" alt="Export Quality System" class="img-fluid me-3" style="max-height: 80px;">
+                <div class="logo-text">
+                    <div>Система добровольной сертификации</div>
+                    <div class="export-quality">"Export Quality System"</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Результаты поиска по запросу: "{{ search_query }}"</h5>
+                </div>
+                <div class="card-body">
+                    {% if certificates %}
+                        {% for certificate in certificates %}
+                            <div class="certificate-details">
+                                <div class="row mb-3">
+                                    <div class="col-md-4 fw-bold">Наименование организации:</div>
+                                    <div class="col-md-8">{{ certificate.name }}</div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-4 fw-bold">ИНН организации:</div>
+                                    <div class="col-md-8">{{ certificate.inn }}</div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-4 fw-bold">Номер сертификата:</div>
+                                    <div class="col-md-8">{{ certificate.full_certificate_number }}</div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-4 fw-bold">Стандарт:</div>
+                                    <div class="col-md-8">{{ certificate.iso_standard }}</div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-4 fw-bold">1-й плановый инспекционный контроль:</div>
+                                    <div class="col-md-8">
+                                        {% if certificate.first_inspection_status == 'passed' %}
+                                            <span class="badge bg-success">Пройден</span>
+                                            {% if certificate.first_inspection_date %}
+                                                ({{ certificate.first_inspection_date|date:"d.m.Y" }})
+                                            {% endif %}
+                                        {% elif certificate.first_inspection_status == 'failed' %}
+                                            <span class="badge bg-danger">Не пройден</span>
+                                            {% if certificate.first_inspection_date %}
+                                                ({{ certificate.first_inspection_date|date:"d.m.Y" }})
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-info">Ожидается в будущем</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-4 fw-bold">2-й плановый инспекционный контроль:</div>
+                                    <div class="col-md-8">
+                                        {% if certificate.second_inspection_status == 'passed' %}
+                                            <span class="badge bg-success">Пройден</span>
+                                            {% if certificate.second_inspection_date %}
+                                                ({{ certificate.second_inspection_date|date:"d.m.Y" }})
+                                            {% endif %}
+                                        {% elif certificate.second_inspection_status == 'failed' %}
+                                            <span class="badge bg-danger">Не пройден</span>
+                                            {% if certificate.second_inspection_date %}
+                                                ({{ certificate.second_inspection_date|date:"d.m.Y" }})
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-info">Ожидается в будущем</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-4 fw-bold">Статус:</div>
+                                    <div class="col-md-8">
+                                        {% if certificate.status == 'active' %}
+                                            <span class="badge bg-success">Действителен</span>
+                                        {% elif certificate.status == 'inspection_failed' %}
+                                            <span class="badge bg-warning">Действие сертификата приостановлено, не пройден инспекционный контроль</span>
+                                        {% elif certificate.status == 'expired' %}
+                                            <span class="badge bg-danger">Действие сертификата приостановлено, истек срок действия</span>
+                                        {% elif certificate.status == 'revoked' %}
+                                            <span class="badge bg-danger">Отозван</span>
+                                        {% elif certificate.status == 'pending' %}
+                                            <span class="badge bg-info">В ожидании</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-4 fw-bold">Срок действия:</div>
+                                    <div class="col-md-8">
+                                        с {{ certificate.start_date|date:"d.m.Y" }} по {{ certificate.expiry_date|date:"d.m.Y" }}
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-4 fw-bold">Уведомления:</div>
+                                    <div class="col-md-8">
+                                        {% if certificate.notifications_enabled %}
+                                            <span class="badge bg-success"><i class="fas fa-check"></i> Подключены</span>
+                                        {% else %}
+                                            <span class="badge bg-danger"><i class="fas fa-times"></i> Отключены</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                               <div class="row mb-3">
+                                    <div class="col-md-4 fw-bold">Сертификаты и аудиты:</div>
+                                    <div class="col-md-8">
+                                        <div class="d-flex flex-wrap gap-3">
+                                            {% if certificate.file1 %}
+                                                <div class="certificate-thumbnail">
+                                                    <img src="{% if certificate.file1.url|lower|slice:'-4:' == '.pdf' %}{% static 'certificates/img/pdf_icon.png' %}{% else %}{{ certificate.file1.url }}{% endif %}" 
+                                                        alt="Сертификат 1" 
+                                                        class="img-thumbnail certificate-preview" 
+                                                        data-bs-toggle="modal" 
+                                                        data-bs-target="#certificateModal{{ certificate.id }}1"
+                                                        style="max-height: 100px; cursor: pointer;">
+                                                    <div class="text-center mt-1">Сертификат соответствия</div>
+                                                </div>
+                                                
+                                                <!-- Модальное окно для сертификата 1 -->
+                                                <div class="modal fade" id="certificateModal{{ certificate.id }}1" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal-dialog modal-xl">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title">Сертификат соответствия</h5>
+                                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                            </div>
+                                                            <div class="modal-body text-center">
+                                                                {% if certificate.file1.url|lower|slice:'-4:' == '.pdf' %}
+                                                                    <iframe src="{{ certificate.file1.url }}" width="100%" height="600px"></iframe>
+                                                                {% else %}
+                                                                    <img src="{{ certificate.file1.url }}" class="img-fluid" alt="Сертификат">
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <a href="{{ certificate.file1.url }}" class="btn btn-danger" download>Скачать</a>
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                            
+                                            {% if certificate.file2 %}
+                                                <div class="certificate-thumbnail">
+                                                    <img src="{% if certificate.file2.url|lower|slice:'-4:' == '.pdf' %}{% static 'certificates/img/pdf_icon.png' %}{% else %}{{ certificate.file2.url }}{% endif %}" 
+                                                        alt="Приложение" 
+                                                        class="img-thumbnail certificate-preview" 
+                                                        data-bs-toggle="modal" 
+                                                        data-bs-target="#certificateModal{{ certificate.id }}2"
+                                                        style="max-height: 100px; cursor: pointer;">
+                                                    <div class="text-center mt-1">Разрешение</div>
+                                                </div>
+                                                
+                                                <!-- Модальное окно для сертификата 2 -->
+                                                <div class="modal fade" id="certificateModal{{ certificate.id }}2" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal-dialog modal-xl">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title">Разрешение</h5>
+                                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                            </div>
+                                                            <div class="modal-body text-center">
+                                                                {% if certificate.file2.url|lower|slice:'-4:' == '.pdf' %}
+                                                                    <iframe src="{{ certificate.file2.url }}" width="100%" height="600px"></iframe>
+                                                                {% else %}
+                                                                    <img src="{{ certificate.file2.url }}" class="img-fluid" alt="Разрешение">
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <a href="{{ certificate.file2.url }}" class="btn btn-danger" download>Скачать</a>
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+
+                                            {% if certificate.file3 %}
+                                                <div class="certificate-thumbnail">
+                                                    <img src="{% if certificate.file3.url|lower|slice:'-4:' == '.pdf' %}{% static 'certificates/img/pdf_icon.png' %}{% else %}{{ certificate.file3.url }}{% endif %}" 
+                                                        alt="Дополнительный файл" 
+                                                        class="img-thumbnail certificate-preview" 
+                                                        data-bs-toggle="modal" 
+                                                        data-bs-target="#certificateModal{{ certificate.id }}3"
+                                                        style="max-height: 100px; cursor: pointer;">
+                                                    <div class="text-center mt-1">Дополнительный файл</div>
+                                                </div>
+                                                
+                                                <!-- Модальное окно для сертификата 3 -->
+                                                <div class="modal fade" id="certificateModal{{ certificate.id }}3" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal-dialog modal-xl">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title">Дополнительный файл</h5>
+                                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                            </div>
+                                                            <div class="modal-body text-center">
+                                                                {% if certificate.file3.url|lower|slice:'-4:' == '.pdf' %}
+                                                                    <iframe src="{{ certificate.file3.url }}" width="100%" height="600px"></iframe>
+                                                                {% else %}
+                                                                    <img src="{{ certificate.file3.url }}" class="img-fluid" alt="Сертификат аудитора">
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <a href="{{ certificate.file3.url }}" class="btn btn-danger" download>Скачать</a>
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                            {% for auditor in certificate.auditors.all %}
+                                                {% if auditor.audit_file %}
+                                                    <div class="certificate-thumbnail">
+                                                        <img src="{% if auditor.audit_file.url|lower|slice:'-4:' == '.pdf' %}{% static 'certificates/img/pdf_icon.png' %}{% else %}{{ auditor.audit_file.url }}{% endif %}" 
+                                                            alt="Аудит {{ forloop.counter }}" 
+                                                            class="img-thumbnail certificate-preview" 
+                                                            data-bs-toggle="modal" 
+                                                            data-bs-target="#auditModal{{ certificate.id }}{{ forloop.counter }}"
+                                                            style="max-height: 100px; cursor: pointer;">
+                                                        <div class="text-center mt-1">Сертификат соответствия аудитора {{ forloop.counter }}</div>
+                                                    </div>
+                                                    
+                                                    <!-- Модальное окно для аудита -->
+                                                    <div class="modal fade" id="auditModal{{ certificate.id }}{{ forloop.counter }}" tabindex="-1" aria-hidden="true">
+                                                        <div class="modal-dialog modal-xl">
+                                                            <div class="modal-content">
+                                                                <div class="modal-header">
+                                                                    <h5 class="modal-title">Сертификат соответствия аудитора {{ forloop.counter }}</h5>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                                </div>
+                                                                <div class="modal-body text-center">
+                                                                    {% if auditor.audit_file.url|lower|slice:'-4:' == '.pdf' %}
+                                                                        <iframe src="{{ auditor.audit_file.url }}" width="100%" height="600px"></iframe>
+                                                                    {% else %}
+                                                                        <img src="{{ auditor.audit_file.url }}" class="img-fluid" alt="Аудит {{ forloop.counter }}">
+                                                                    {% endif %}
+                                                                </div>
+                                                                <div class="modal-footer">
+                                                                    <a href="{{ auditor.audit_file.url }}" class="btn btn-danger" download>Скачать</a>
+                                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
+                                           {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% if not forloop.last %}
+                                <hr class="my-4">
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> По вашему запросу ничего не найдено. Пожалуйста, проверьте правильность ввода номера сертификата.
+                        </div>
+                    {% endif %}
+                    </div>
+                </div>  
+                <div class="text-center mt-4">
+                    <a href="{% url 'index' %}" class="btn btn-outline-secondary btn-lg">
+                        <i class="fas fa-arrow-left"></i> Вернуться к поиску
+                    </a>
+                </div>
+                {% endblock %}
+
+                                        

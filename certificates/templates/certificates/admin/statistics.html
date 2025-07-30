@@ -1,0 +1,182 @@
+{% extends 'certificates/base.html' %}
+{% load static %}
+
+{% block title %}Статистика по сертификатам{% endblock %}
+
+{% block header %}Статистика по сертификатам{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="mb-4">
+        <a href="{% url 'admin_certificates' %}" class="btn btn-secondary">Назад к списку</a>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5>Общая статистика</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Всего сертификатов:</strong> {{ total_certificates }}</p>
+                    <p><strong>Действительных:</strong> {{ active_certificates }}</p>
+                    <p><strong>Приостановлено (контроль):</strong> {{ inspection_failed_certificates }}</p>
+                    <p><strong>Приостановлено (истек срок):</strong> {{ expired_certificates }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5>1-й инспекционный контроль</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Пройден:</strong> {{ first_inspection_passed }}</p>
+                    <p><strong>Не пройден:</strong> {{ first_inspection_failed }}</p>
+                    <p><strong>Ожидается:</strong> {{ first_inspection_pending }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5>2-й инспекционный контроль</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Пройден:</strong> {{ second_inspection_passed }}</p>
+                    <p><strong>Не пройден:</strong> {{ second_inspection_failed }}</p>
+                    <p><strong>Ожидается:</strong> {{ second_inspection_pending }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h5>Статистика по стандартам ISO</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Стандарт</th>
+                            <th>Количество сертификатов</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for standard, count in iso_stats.items %}
+                        <tr>
+                            <td>{{ standard }}</td>
+                            <td>{{ count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Графическое представление статистики -->
+    <div class="card mb-4">
+        <div class="card-header bg-dark text-white">
+            <h5>Графики</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <h6 class="text-center">Статусы сертификатов</h6>
+                    <canvas id="statusChart" width="400" height="300"></canvas>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <h6 class="text-center">Инспекционные контроли</h6>
+                    <canvas id="inspectionChart" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // График статусов сертификатов
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    const statusChart = new Chart(statusCtx, {
+        type: 'pie',
+        data: {
+            labels: ['Действительные', 'Приостановлены (контроль)', 'Приостановлены (истек срок)'],
+            datasets: [{
+                data: [{{ active_certificates }}, {{ inspection_failed_certificates }}, {{ expired_certificates }}],
+                backgroundColor: [
+                    'rgba(40, 167, 69, 0.7)',  // зеленый
+                    'rgba(255, 193, 7, 0.7)',  // желтый
+                    'rgba(220, 53, 69, 0.7)'   // красный
+                ],
+                borderColor: [
+                    'rgba(40, 167, 69, 1)',
+                    'rgba(255, 193, 7, 1)',
+                    'rgba(220, 53, 69, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                }
+            }
+        }
+    });
+    
+    // График инспекционных контролей
+    const inspectionCtx = document.getElementById('inspectionChart').getContext('2d');
+    const inspectionChart = new Chart(inspectionCtx, {
+        type: 'bar',
+        data: {
+            labels: ['1-й контроль', '2-й контроль'],
+            datasets: [
+                {
+                    label: 'Пройден',
+                    data: [{{ first_inspection_passed }}, {{ second_inspection_passed }}],
+                    backgroundColor: 'rgba(40, 167, 69, 0.7)',
+                    borderColor: 'rgba(40, 167, 69, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Не пройден',
+                    data: [{{ first_inspection_failed }}, {{ second_inspection_failed }}],
+                    backgroundColor: 'rgba(220, 53, 69, 0.7)',
+                    borderColor: 'rgba(220, 53, 69, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Ожидается',
+                    data: [{{ first_inspection_pending }}, {{ second_inspection_pending }}],
+                    backgroundColor: 'rgba(23, 162, 184, 0.7)',
+                    borderColor: 'rgba(23, 162, 184, 1)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

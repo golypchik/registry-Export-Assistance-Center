@@ -1,0 +1,227 @@
+{% load static %}
+{% load certificate_filters %}
+{% extends 'certificates/base.html' %}
+
+{% block title %}Управление инспекционными контролями{% endblock %}
+
+{% block header %}Управление инспекционными контролями{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="mb-4">
+        <a href="{% url 'admin_certificates' %}" class="btn btn-secondary">Назад к списку</a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-danger text-white">
+            <h5>Сертификат: {{ certificate.certificate_number }}</h5>
+        </div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-4 fw-bold">Организация:</div>
+                <div class="col-md-8">{{ certificate.name }}</div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-4 fw-bold">ИНН:</div>
+                <div class="col-md-8">{{ certificate.inn }}</div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-4 fw-bold">Стандарт:</div>
+                <div class="col-md-8">{{ certificate.iso_standard }}</div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-4 fw-bold">Срок действия:</div>
+                <div class="col-md-8">
+                    с {{ certificate.start_date|date:"d.m.Y" }} по {{ certificate.expiry_date|date:"d.m.Y" }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h5>Файлы сертификата</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% if certificate.file1 or certificate.file2 or certificate.file3 %}
+                    {% if certificate.file1 %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h6>Сертификат</h6>
+                                {% if certificate.file1.url|lower|slice:'-4:' == '.pdf' %}
+                                    <img src="{% static 'certificates/img/pdf_icon.png' %}" alt="PDF" style="max-height: 100px; margin-bottom: 10px;">
+                                {% else %}
+                                    <img src="{{ certificate.file1.url }}" alt="Сертификат" style="max-height: 100px; margin-bottom: 10px;">
+                                {% endif %}
+                                <div>
+                                    <a href="{{ certificate.file1.url }}" class="btn btn-danger btn-sm" download>
+                                        <i class="fas fa-download"></i> Скачать
+                                    </a>
+                                    <a href="{{ certificate.file1.url }}" class="btn btn-info btn-sm" target="_blank">
+                                        <i class="fas fa-eye"></i> Просмотр
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if certificate.file2 %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h6>Приложение</h6>
+                                {% if certificate.file2.url|lower|slice:'-4:' == '.pdf' %}
+                                    <img src="{% static 'certificates/img/pdf_icon.png' %}" alt="PDF" style="max-height: 100px; margin-bottom: 10px;">
+                                {% else %}
+                                    <img src="{{ certificate.file2.url }}" alt="Приложение" style="max-height: 100px; margin-bottom: 10px;">
+                                {% endif %}
+                                <div>
+                                    <a href="{{ certificate.file2.url }}" class="btn btn-danger btn-sm" download>
+                                        <i class="fas fa-download"></i> Скачать
+                                    </a>
+                                    <a href="{{ certificate.file2.url }}" class="btn btn-info btn-sm" target="_blank">
+                                        <i class="fas fa-eye"></i> Просмотр
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if certificate.file3 %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h6>Дополнительно</h6>
+                                {% if certificate.file3.url|lower|slice:'-4:' == '.pdf' %}
+                                    <img src="{% static 'certificates/img/pdf_icon.png' %}" alt="PDF" style="max-height: 100px; margin-bottom: 10px;">
+                                {% else %}
+                                    <img src="{{ certificate.file3.url }}" alt="Дополнительный файл" style="max-height: 100px; margin-bottom: 10px;">
+                                {% endif %}
+                                <div>
+                                    <a href="{{ certificate.file3.url }}" class="btn btn-danger btn-sm" download>
+                                        <i class="fas fa-download"></i> Скачать
+                                    </a>
+                                    <a href="{{ certificate.file3.url }}" class="btn btn-info btn-sm" target="_blank">
+                                        <i class="fas fa-eye"></i> Просмотр
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% else %}
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> Файлы сертификата не загружены.
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5>1-й плановый инспекционный контроль</h5>
+                </div>
+                <div class="card-body">
+                    <p>Текущий статус: 
+                        {% if certificate.first_inspection_status == 'passed' %}
+                            <span class="badge bg-success">Пройден</span>
+                            {% if certificate.first_inspection_date %}
+                                ({{ certificate.first_inspection_date|date:"d.m.Y" }})
+                            {% endif %}
+                        {% elif certificate.first_inspection_status == 'failed' %}
+                            <span class="badge bg-danger">Не пройден</span>
+                            {% if certificate.first_inspection_date %}
+                                ({{ certificate.first_inspection_date|date:"d.m.Y" }})
+                            {% endif %}
+                        {% else %}
+                            <span class="badge bg-info">Ожидается в будущем</span>
+                        {% endif %}
+                    </p>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label">Изменить статус:</label>
+                            <select name="first_inspection_status" class="form-select">
+                                <option value="pending" {% if certificate.first_inspection_status == 'pending' %}selected{% endif %}>Ожидается в будущем</option>
+                                <option value="passed" {% if certificate.first_inspection_status == 'passed' %}selected{% endif %}>Пройден</option>
+                                <option value="failed" {% if certificate.first_inspection_status == 'failed' %}selected{% endif %}>Не пройден</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-danger">Сохранить</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5>2-й плановый инспекционный контроль</h5>
+                </div>
+                <div class="card-body">
+                    <p>Текущий статус: 
+                        {% if certificate.second_inspection_status == 'passed' %}
+                            <span class="badge bg-success">Пройден</span>
+                            {% if certificate.second_inspection_date %}
+                                ({{ certificate.second_inspection_date|date:"d.m.Y" }})
+                            {% endif %}
+                        {% elif certificate.second_inspection_status == 'failed' %}
+                            <span class="badge bg-danger">Не пройден</span>
+                            {% if certificate.second_inspection_date %}
+                                ({{ certificate.second_inspection_date|date:"d.m.Y" }})
+                            {% endif %}
+                        {% else %}
+                            <span class="badge bg-info">Ожидается в будущем</span>
+                        {% endif %}
+                    </p>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label">Изменить статус:</label>
+                            <select name="second_inspection_status" class="form-select">
+                                <option value="pending" {% if certificate.second_inspection_status == 'pending' %}selected{% endif %}>Ожидается в будущем</option>
+                                <option value="passed" {% if certificate.second_inspection_status == 'passed' %}selected{% endif %}>Пройден</option>
+                                <option value="failed" {% if certificate.second_inspection_status == 'failed' %}selected{% endif %}>Не пройден</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-danger">Сохранить</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5>Текущий статус сертификата</h5>
+        </div>
+        <div class="card-body">
+            <p>
+                {% if certificate.status == 'active' %}
+                    <span class="badge bg-success">Действителен</span>
+                {% elif certificate.status == 'inspection_failed' %}
+                    <span class="badge bg-warning">Действие сертификата приостановлено, не пройден инспекционный контроль</span>
+                {% elif certificate.status == 'expired' %}
+                    <span class="badge bg-danger">Действие сертификата приостановлено, истек срок действия</span>
+                {% elif certificate.status == 'revoked' %}
+                    <span class="badge bg-danger">Отозван</span>
+                {% elif certificate.status == 'pending' %}
+                    <span class="badge bg-info">В ожидании</span>
+                {% endif %}
+            </p>
+            <p class="text-muted">Статус сертификата обновляется автоматически на основе дат и результатов инспекционных контролей.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

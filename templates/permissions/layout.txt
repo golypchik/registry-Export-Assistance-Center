@@ -1,0 +1,15 @@
+background: permissions_background.png
+stamp: stamp.png
+signature: signature.png
+
+[static_text]
+font: Times New Roman
+color: #000000
+
+[dynamic_fields]
+name: x=100, y=300, font=Times New Roman, size=12, color=#000000
+inn: x=100, y=320, font=Times New Roman, size=12, color=#000000
+address: x=100, y=340, font=Times New Roman, size=12, color=#000000
+
+[qr_code]
+x=450, y=650, size=100x100

@@ -1,0 +1,33 @@
+{% extends 'certificates/base.html' %}
+{% load static %}
+
+{% block title %}Удаление сертификата{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2>Удаление сертификата</h2>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h4 class="mb-4">Вы действительно хотите удалить сертификат?</h4>
+                    <p class="mb-4">{{ certificate.name }} ({{ certificate.certificate_number }})</p>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-center">
+                            <a href="{% url 'admin_certificates' %}" class="btn btn-outline-secondary me-2">Отмена</a>
+                            <button type="submit" class="btn btn-danger">Удалить</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

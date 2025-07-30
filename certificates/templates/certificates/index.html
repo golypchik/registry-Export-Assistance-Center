@@ -1,0 +1,35 @@
+{% extends 'certificates/base.html' %}
+{% load static %}
+
+{% block title %}Система добровольной сертификации "Export Quality System"{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-5">
+        <div class="col-md-8 offset-md-2 text-center">
+            <div class="d-flex justify-content-center align-items-center mb-4">
+                <img src="{% static 'certificates/img/logo1.png' %}" alt="Export Quality System" class="img-fluid me-3" style="max-height: 80px;">
+                <div class="logo-text">
+                    <div>Система добровольной сертификации</div>
+                    <div class="export-quality">"Export Quality System"</div>
+                </div>
+            </div>
+            
+            <div class="card shadow">
+                <div class="card-body p-5">
+                    <h4 class="mb-4">Проверка сертификата</h4>
+                    <form method="get" action="{% url 'search_results' %}">
+                        <div class="mb-4">
+                            <label for="search_query" class="form-label">Введите номер сертификата:</label>
+                            <input type="text" class="form-control form-control-lg" id="search_query" name="search_query" required>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-danger btn-lg">Найти</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

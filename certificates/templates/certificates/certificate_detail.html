@@ -1,0 +1,154 @@
+{% extends 'certificates/base.html' %}
+{% load static %}
+
+{% block title %}Детали сертификата{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-8 offset-md-2 text-center">
+            <div class="d-flex justify-content-center align-items-center mb-4">
+                <img src="{% static 'certificates/img/logo1.png' %}" alt="Export Quality System" class="img-fluid me-3" style="max-height: 80px;">
+                <div class="logo-text">
+                    <div>Система добровольной сертификации</div>
+                    <div class="export-quality">"Export Quality System"</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Информация о сертификате № {{ certificate.full_certificate_number }}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="certificate-details">
+                        <div class="row mb-3">
+                            <div class="col-md-4 fw-bold">Наименование организации:</div>
+                            <div class="col-md-8">{{ certificate.name }}</div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4 fw-bold">ИНН организации:</div>
+                            <div class="col-md-8">{{ certificate.inn }}</div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4 fw-bold">Адрес:</div>
+                            <div class="col-md-8">{{ certificate.address }}</div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4 fw-bold">Стандарт:</div>
+                            <div class="col-md-8">{{ certificate.iso_standard }}</div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4 fw-bold">Система менеджмента качества:</div>
+                            <div class="col-md-8">{{ certificate.quality_management_system }}</div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4 fw-bold">1-й плановый инспекционный контроль:</div>
+                            <div class="col-md-8">
+                                {% if certificate.first_inspection_status == 'passed' %}
+                                    <span class="badge bg-success">Пройден</span>
+                                    {% if certificate.first_inspection_date %}
+                                        ({{ certificate.first_inspection_date|date:"d.m.Y" }})
+                                    {% endif %}
+                                {% elif certificate.first_inspection_status == 'failed' %}
+                                    <span class="badge bg-danger">Не пройден</span>
+                                    {% if certificate.first_inspection_date %}
+                                        ({{ certificate.first_inspection_date|date:"d.m.Y" }})
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-info">Ожидается в будущем</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4 fw-bold">2-й плановый инспекционный контроль:</div>
+                            <div class="col-md-8">
+                                {% if certificate.second_inspection_status == 'passed' %}
+                                    <span class="badge bg-success">Пройден</span>
+                                    {% if certificate.second_inspection_date %}
+                                        ({{ certificate.second_inspection_date|date:"d.m.Y" }})
+                                    {% endif %}
+                                {% elif certificate.second_inspection_status == 'failed' %}
+                                    <span class="badge bg-danger">Не пройден</span>
+                                    {% if certificate.second_inspection_date %}
+                                        ({{ certificate.second_inspection_date|date:"d.m.Y" }})
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-info">Ожидается в будущем</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4 fw-bold">Статус:</div>
+                            <div class="col-md-8">
+                                {% if certificate.status == 'active' %}
+                                    <span class="badge bg-success">Действителен</span>
+                                {% elif certificate.status == 'inspection_failed' %}
+                                    <span class="badge bg-warning">Действие сертификата приостановлено, не пройден инспекционный контроль</span>
+                                {% elif certificate.status == 'expired' %}
+                                    <span class="badge bg-danger">Действие сертификата приостановлено, истек срок действия</span>
+                                {% elif certificate.status == 'revoked' %}
+                                    <span class="badge bg-danger">Отозван</span>
+                                {% elif certificate.status == 'pending' %}
+                                    <span class="badge bg-info">В ожидании</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4 fw-bold">Срок действия:</div>
+                            <div class="col-md-8">
+                                с {{ certificate.start_date|date:"d.m.Y" }} по {{ certificate.expiry_date|date:"d.m.Y" }}
+                            </div>
+                        </div>
+                        
+                        {% if certificate.auditors.all %}
+                        <div class="row mb-3">
+                            <div class="col-md-4 fw-bold">Аудиторы:</div>
+                            <div class="col-md-8">
+                                <ul class="list-unstyled">
+                                    {% for auditor in certificate.auditors.all %}
+                                        <li>{{ auditor.full_name }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-4 fw-bold">Файлы:</div>
+                            <div class="col-md-8">
+                                <div class="d-flex flex-column gap-2">
+                                    {% if certificate.file1 %}
+                                        <a href="{% url 'download_file' certificate.id 1 %}" class="btn btn-outline-primary">
+                                            <i class="fas fa-download"></i> Скачать сертификат
+                                        </a>
+                                    {% endif %}
+                                    {% if certificate.file2 %}
+                                        <a href="{% url 'download_file' certificate.id 2 %}" class="btn btn-outline-primary">
+                                            <i class="fas fa-download"></i> Скачать приложение
+                                        </a>
+                                    {% endif %}
+                                    {% if certificate.file3 %}
+                                        <a href="{% url 'download_file' certificate.id 3 %}" class="btn btn-outline-primary">
+                                            <i class="fas fa-download"></i> Скачать дополнительные материалы
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-center mt-4">
+                <a href="{% url 'index' %}" class="btn btn-outline-secondary btn-lg">
+                    <i class="fas fa-arrow-left"></i> Вернуться к поиску
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

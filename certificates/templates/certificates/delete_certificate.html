@@ -1,0 +1,27 @@
+{% extends 'certificates/base.html' %}
+
+{% block title %}Удаление сертификата{% endblock %}
+
+{% block header %}Удаление сертификата{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'admin_certificates' %}" class="btn btn-secondary">Назад к списку</a>
+</div>
+
+<div class="card">
+    <div class="card-header bg-danger text-white">
+        <h5>Подтверждение удаления</h5>
+    </div>
+    <div class="card-body">
+        <p>Вы действительно хотите удалить сертификат "{{ certificate.name }}" для ИНН {{ certificate.inn }}?</p>
+        <p>Это действие нельзя будет отменить.</p>
+        
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Да, удалить</button>
+            <a href="{% url 'admin_certificates' %}" class="btn btn-secondary">Отмена</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

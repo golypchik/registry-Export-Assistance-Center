@@ -1,0 +1,88 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Система добровольной сертификации "Export Quality System"{% endblock %}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    {% block extra_css %}{% endblock %}
+    <style>
+        .certificate-thumbnail {
+            display: inline-block;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .certificate-preview {
+            transition: transform 0.2s;
+        }
+        
+        .certificate-preview:hover {
+            transform: scale(1.05);
+        }
+        
+        .modal-xl {
+            max-width: 90%;
+        }
+        body {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+            background-color: #f8f9fa;
+        }
+        .footer {
+            margin-top: 3rem;
+            padding-top: 1rem;
+            text-align: center;
+        }
+        .logo-text {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+        }
+        .export-quality {
+            font-weight: bold;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {% block content %}{% endblock %}
+
+        <div class="footer">
+            <div class="d-flex align-items-center justify-content-center">
+                <div class="text-center">
+                    <div class="mb-2">ООО "Центр содействия экспорту"</div>
+                    <img src="{% static 'certificates/img/logo2.png' %}" alt="Центр содействия экспорту" class="img-fluid" style="max-height: 60px;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для предпросмотра изображений -->
+    <div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-labelledby="imagePreviewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imagePreviewModalLabel">Предпросмотр изображения</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <img src="" id="previewImage" class="img-fluid" alt="Предпросмотр">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'certificates/js/jquery.min.js' %}"></script>
+    <script src="{% static 'certificates/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

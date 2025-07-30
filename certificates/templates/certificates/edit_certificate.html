@@ -1,0 +1,506 @@
+{% extends 'certificates/base.html' %}
+{% load static %}
+
+{% block title %}Редактирование сертификата{% endblock %}
+
+{% block extra_css %}
+<style>
+    .auditor-form {
+        border: 1px solid #ddd;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+    }
+    .delete-auditor {
+        color: #dc3545;
+        cursor: pointer;
+    }
+    .preview-image {
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+    .preview-image:hover {
+        transform: scale(1.2);
+    }
+</style>
+{% endblock %}
+
+{% block header %}Редактирование сертификата: {{ certificate.name }}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'admin_certificates' %}" class="btn btn-secondary">Назад к списку</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label for="{{ form.name.id_for_label }}" class="form-label">{{ form.name.label }}</label>
+                {{ form.name }}
+                {% if form.name.errors %}
+                <div class="text-danger">
+                    {{ form.name.errors }}
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="mb-3">
+                <label for="{{ form.inn.id_for_label }}" class="form-label">{{ form.inn.label }}</label>
+                {{ form.inn }}
+                {% if form.inn.errors %}
+                <div class="text-danger">
+                    {{ form.inn.errors }}
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="mb-3">
+                <label for="{{ form.status.id_for_label }}" class="form-label">{{ form.status.label }}</label>
+                {{ form.status }}
+                {% if form.status.errors %}
+                <div class="text-danger">
+                    {{ form.status.errors }}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Секция файлов -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5>Файлы сертификата</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Файл сертификата -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6>Файл сертификата:</h6>
+                                    {% if certificate.file1 %}
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <p>Текущий файл: <a href="{{ certificate.file1.url }}" target="_blank">{{ certificate.file1.name }}</a></p>
+                                                <label for="{{ form.file1.id_for_label }}" class="form-label">{{ form.file1.label }}</label>
+                                                {{ form.file1 }}
+                                                {% if form.file1_cleared %}
+                                                    <div class="form-check mt-2">
+                                                        {{ form.file1_cleared }}
+                                                        <label class="form-check-label text-danger" for="{{ form.file1_cleared.id_for_label }}">
+                                                            Удалить файл сертификата
+                                                        </label>
+                                                    </div>
+                                                {% endif %}
+                                                {% if form.file1.errors %}
+                                                    <div class="text-danger">{{ form.file1.errors }}</div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="text-center">
+                                                    {% if certificate.file1.url|lower|slice:'-4:' == '.pdf' %}
+                                                        <img src="{% static 'certificates/img/pdf_icon.png' %}" alt="PDF" style="max-height: 100px;">
+                                                    {% else %}
+                                                        <img src="{{ certificate.file1.url }}" alt="Файл сертификата" style="max-height: 100px;" class="preview-image">
+                                                    {% endif %}
+                                                    <div class="mt-2">
+                                                        <a href="{{ certificate.file1.url }}" class="btn btn-info btn-sm" target="_blank">
+                                                            <i class="fas fa-eye"></i> Просмотр
+                                                        </a>
+                                                        <a href="{{ certificate.file1.url }}" class="btn btn-danger btn-sm" download>
+                                                            <i class="fas fa-download"></i> Скачать
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% else %}
+                                        <p>Файл не загружен</p>
+                                        <label for="{{ form.file1.id_for_label }}" class="form-label">{{ form.file1.label }}</label>
+                                        {{ form.file1 }}
+                                        {% if form.file1.errors %}
+                                            <div class="text-danger">{{ form.file1.errors }}</div>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Сертификат (PSD) -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6>Сертификат (PSD):</h6>
+                                    {% if certificate.file1_psd %}
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <p>Текущий файл: <a href="{{ certificate.file1_psd.url }}" target="_blank">{{ certificate.file1_psd.name }}</a></p>
+                                                <label for="{{ form.file1_psd.id_for_label }}" class="form-label">{{ form.file1_psd.label }}</label>
+                                                {{ form.file1_psd }}
+                                                {% if form.file1_psd_cleared %}
+                                                    <div class="form-check mt-2">
+                                                        {{ form.file1_psd_cleared }}
+                                                        <label class="form-check-label text-danger" for="{{ form.file1_psd_cleared.id_for_label }}">
+                                                            Удалить PSD файл сертификата
+                                                        </label>
+                                                    </div>
+                                                {% endif %}
+                                                {% if form.file1_psd.errors %}
+                                                    <div class="text-danger">{{ form.file1_psd.errors }}</div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="text-center">
+                                                    {% if certificate.file1_psd.url|lower|slice:'-4:' == '.pdf' %}
+                                                        <img src="{% static 'certificates/img/pdf_icon.png' %}" alt="PDF" style="max-height: 100px;">
+                                                    {% else %}
+                                                        <img src="{{ certificate.file1_psd.url }}" alt="Сертификат PSD" style="max-height: 100px;" class="preview-image">
+                                                    {% endif %}
+                                                    <div class="mt-2">
+                                                        <a href="{{ certificate.file1_psd.url }}" class="btn btn-info btn-sm" target="_blank">
+                                                            <i class="fas fa-eye"></i> Просмотр
+                                                        </a>
+                                                        <a href="{{ certificate.file1_psd.url }}" class="btn btn-danger btn-sm" download>
+                                                            <i class="fas fa-download"></i> Скачать
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% else %}
+                                        <p>Файл не загружен</p>
+                                        <label for="{{ form.file1_psd.id_for_label }}" class="form-label">{{ form.file1_psd.label }}</label>
+                                        {{ form.file1_psd }}
+                                        {% if form.file1_psd.errors %}
+                                            <div class="text-danger">{{ form.file1_psd.errors }}</div>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Файл приложения -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6>Файл приложения:</h6>
+                                    {% if certificate.file2 %}
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <p>Текущий файл: <a href="{{ certificate.file2.url }}" target="_blank">{{ certificate.file2.name }}</a></p>
+                                                <label for="{{ form.file2.id_for_label }}" class="form-label">{{ form.file2.label }}</label>
+                                                {{ form.file2 }}
+                                                {% if form.file2_cleared %}
+                                                    <div class="form-check mt-2">
+                                                        {{ form.file2_cleared }}
+                                                        <label class="form-check-label text-danger" for="{{ form.file2_cleared.id_for_label }}">
+                                                            Удалить файл приложения
+                                                        </label>
+                                                    </div>
+                                                {% endif %}
+                                                {% if form.file2.errors %}
+                                                    <div class="text-danger">{{ form.file2.errors }}</div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="text-center">
+                                                    {% if certificate.file2.url|lower|slice:'-4:' == '.pdf' %}
+                                                        <img src="{% static 'certificates/img/pdf_icon.png' %}" alt="PDF" style="max-height: 100px;">
+                                                    {% else %}
+                                                        <img src="{{ certificate.file2.url }}" alt="Файл приложения" style="max-height: 100px;" class="preview-image">
+                                                    {% endif %}
+                                                    <div class="mt-2">
+                                                        <a href="{{ certificate.file2.url }}" class="btn btn-info btn-sm" target="_blank">
+                                                            <i class="fas fa-eye"></i> Просмотр
+                                                        </a>
+                                                        <a href="{{ certificate.file2.url }}" class="btn btn-danger btn-sm" download>
+                                                            <i class="fas fa-download"></i> Скачать
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% else %}
+                                        <p>Файл не загружен</p>
+                                        <label for="{{ form.file2.id_for_label }}" class="form-label">{{ form.file2.label }}</label>
+                                        {{ form.file2 }}
+                                        {% if form.file2.errors %}
+                                            <div class="text-danger">{{ form.file2.errors }}</div>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Разрешение (PSD) -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6>Разрешение (PSD):</h6>
+                                    {% if certificate.file2_psd %}
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <p>Текущий файл: <a href="{{ certificate.file2_psd.url }}" target="_blank">{{ certificate.file2_psd.name }}</a></p>
+                                                <label for="{{ form.file2_psd.id_for_label }}" class="form-label">{{ form.file2_psd.label }}</label>
+                                                {{ form.file2_psd }}
+                                                {% if form.file2_psd_cleared %}
+                                                    <div class="form-check mt-2">
+                                                        {{ form.file2_psd_cleared }}
+                                                        <label class="form-check-label text-danger" for="{{ form.file2_psd_cleared.id_for_label }}">
+                                                            Удалить PSD файл разрешения
+                                                        </label>
+                                                    </div>
+                                                {% endif %}
+                                                {% if form.file2_psd.errors %}
+                                                    <div class="text-danger">{{ form.file2_psd.errors }}</div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="text-center">
+                                                    {% if certificate.file2_psd.url|lower|slice:'-4:' == '.pdf' %}
+                                                        <img src="{% static 'certificates/img/pdf_icon.png' %}" alt="PDF" style="max-height: 100px;">
+                                                    {% else %}
+                                                        <img src="{{ certificate.file2_psd.url }}" alt="Разрешение PSD" style="max-height: 100px;" class="preview-image">
+                                                    {% endif %}
+                                                    <div class="mt-2">
+                                                        <a href="{{ certificate.file2_psd.url }}" class="btn btn-info btn-sm" target="_blank">
+                                                            <i class="fas fa-eye"></i> Просмотр
+                                                        </a>
+                                                        <a href="{{ certificate.file2_psd.url }}" class="btn btn-danger btn-sm" download>
+                                                            <i class="fas fa-download"></i> Скачать
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% else %}
+                                        <p>Файл не загружен</p>
+                                        <label for="{{ form.file2_psd.id_for_label }}" class="form-label">{{ form.file2_psd.label }}</label>
+                                        {{ form.file2_psd }}
+                                        {% if form.file2_psd.errors %}
+                                            <div class="text-danger">{{ form.file2_psd.errors }}</div>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Дополнительный файл -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6>Дополнительный файл:</h6>
+                                    {% if certificate.file3 %}
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <p>Текущий файл: <a href="{{ certificate.file3.url }}" target="_blank">{{ certificate.file3.name }}</a></p>
+                                                <label for="{{ form.file3.id_for_label }}" class="form-label">{{ form.file3.label }}</label>
+                                                {{ form.file3 }}
+                                                {% if form.file3_cleared %}
+                                                    <div class="form-check mt-2">
+                                                        {{ form.file3_cleared }}
+                                                        <label class="form-check-label text-danger" for="{{ form.file3_cleared.id_for_label }}">
+                                                            Удалить дополнительный файл
+                                                        </label>
+                                                    </div>
+                                                {% endif %}
+                                                {% if form.file3.errors %}
+                                                    <div class="text-danger">{{ form.file3.errors }}</div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="text-center">
+                                                    {% if certificate.file3.url|lower|slice:'-4:' == '.pdf' %}
+                                                        <img src="{% static 'certificates/img/pdf_icon.png' %}" alt="PDF" style="max-height: 100px;">
+                                                    {% else %}
+                                                        <img src="{{ certificate.file3.url }}" alt="Дополнительный файл" style="max-height: 100px;" class="preview-image">
+                                                    {% endif %}
+                                                    <div class="mt-2">
+                                                        <a href="{{ certificate.file3.url }}" class="btn btn-info btn-sm" target="_blank">
+                                                            <i class="fas fa-eye"></i> Просмотр
+                                                        </a>
+                                                        <a href="{{ certificate.file3.url }}" class="btn btn-danger btn-sm" download>
+                                                            <i class="fas fa-download"></i> Скачать
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% else %}
+                                        <p>Файл не загружен</p>
+                                        <label for="{{ form.file3.id_for_label }}" class="form-label">{{ form.file3.label }}</label>
+                                        {{ form.file3 }}
+                                        {% if form.file3.errors %}
+                                            <div class="text-danger">{{ form.file3.errors }}</div>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Секция аудиторов -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5>Аудиторы</h5>
+                </div>
+                <div class="card-body">
+                    {{ formset.management_form }}
+                    <div id="auditor-forms">
+                        {% for auditor_form in formset %}
+                            <div class="auditor-form">
+                                {{ auditor_form.id }}
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="{{ auditor_form.full_name.id_for_label }}" class="form-label">ФИО аудитора</label>
+                                            {{ auditor_form.full_name }}
+                                            {% if auditor_form.full_name.errors %}
+                                                <div class="text-danger">{{ auditor_form.full_name.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="{{ auditor_form.audit_file.id_for_label }}" class="form-label">Файл аудита</label>
+                                            {{ auditor_form.audit_file }}
+                                            {% if auditor_form.instance.audit_file %}
+                                                <p class="mt-2">Текущий файл: <a href="{{ auditor_form.instance.audit_file.url }}" target="_blank">{{ auditor_form.instance.audit_file.name }}</a></p>
+                                            {% endif %}
+                                            {% if auditor_form.audit_file.errors %}
+                                                <div class="text-danger">{{ auditor_form.audit_file.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                        {% if auditor_form.instance.pk %}
+                                            <div class="form-check">
+                                                {{ auditor_form.DELETE }}
+                                                <label class="form-check-label text-danger" for="{{ auditor_form.DELETE.id_for_label }}">
+                                                    Удалить аудитора
+                                                </label>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {% if auditor_form.instance.generated_audit_image %}
+                                            <div class="text-center">
+                                                <h6>Предпросмотр аудита:</h6>
+                                                <img src="{{ auditor_form.instance.generated_audit_image.url }}" alt="Предпросмотр аудита" style="max-width: 100%; height: auto; max-height: 200px;" class="preview-image">
+                                                <div class="mt-2">
+                                                    <a href="{{ auditor_form.instance.generated_audit_image.url }}" class="btn btn-info btn-sm" target="_blank">
+                                                        <i class="fas fa-eye"></i> Просмотр
+                                                    </a>
+                                                    <a href="{{ auditor_form.instance.generated_audit_image.url }}" class="btn btn-danger btn-sm" download>
+                                                        <i class="fas fa-download"></i> Скачать
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <p class="text-muted">Предпросмотр аудита будет доступен после сохранения.</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" id="add-auditor" class="btn btn-secondary">
+                        <i class="fas fa-plus"></i> Добавить аудитора
+                    </button>
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'admin_certificates' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Отмена
+                </a>
+                <button type="submit" class="btn btn-danger">
+                    <i class="fas fa-save"></i> Сохранить изменения
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const addButton = document.getElementById('add-auditor');
+    const formsContainer = document.getElementById('auditor-forms');
+    const totalForms = document.getElementById('id_auditors-TOTAL_FORMS');
+    
+    addButton.addEventListener('click', function() {
+        const formCount = parseInt(totalForms.value);
+        const newForm = document.querySelector('.auditor-form').cloneNode(true);
+        
+        // Обновляем атрибуты формы
+        newForm.innerHTML = newForm.innerHTML.replace(/auditors-\d+-/g, `auditors-${formCount}-`);
+        newForm.innerHTML = newForm.innerHTML.replace(/auditors_\d+_/g, `auditors_${formCount}_`);
+        
+        // Очищаем значения полей
+        const inputs = newForm.querySelectorAll('input');
+        inputs.forEach(input => {
+            if (input.type !== 'hidden') {
+                input.value = '';
+            }
+        });
+        
+        // Удаляем информацию о текущих файлах
+        const currentFileInfo = newForm.querySelectorAll('p');
+        currentFileInfo.forEach(p => {
+            if (p.textContent.includes('Текущий файл:')) {
+                p.remove();
+            }
+        });
+        
+        // Удаляем сгенерированные изображения
+        const generatedImages = newForm.querySelectorAll('.text-center');
+        generatedImages.forEach(div => {
+            if (div.querySelector('h6') && div.querySelector('h6').textContent.includes('Сгенерированное изображение')) {
+                div.remove();
+            }
+        });
+        
+        // Удаляем чекбокс удаления для новой формы
+        const deleteCheckbox = newForm.querySelector('input[name$="-DELETE"]');
+        if (deleteCheckbox) {
+            deleteCheckbox.parentElement.remove();
+        }
+        
+        formsContainer.appendChild(newForm);
+        totalForms.value = formCount + 1;
+    });
+});
+</script>
+
+<style>
+.preview-image {
+    max-width: 100%;
+    height: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 5px;
+}
+
+.auditor-form {
+    border: 1px solid #e9ecef;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background-color: #f8f9fa;
+}
+
+.certificate-thumbnail {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.certificate-thumbnail img {
+    max-height: 100px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.certificate-thumbnail img:hover {
+    transform: scale(1.05);
+}
+</style>
