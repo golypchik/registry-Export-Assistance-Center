@@ -105,12 +105,12 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# Исправьте STATICFILES_DIRS - укажите правильный путь
+# Путь к статическим файлам приложения
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'certificates', 'static'),  # Изменено с BASE_DIR / 'static'
+    os.path.join(BASE_DIR, 'certificates', 'static'),
 ]
 
-# Настройка WhiteNoise для статических файлов
+# WhiteNoise для обслуживания статических файлов
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Настройки медиа-файлов
