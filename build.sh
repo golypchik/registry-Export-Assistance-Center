@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
-# exit on error
+# File: c:\Users\User\Desktop\cert_checker\cert_checker\build.sh
+
+# Exit on error
 set -o errexit
 
-pip install --upgrade pip
+# Upgrade pip
+python -m pip install --upgrade pip
+
+# Install dependencies
 pip install -r requirements.txt
 
-python manage.py collectstatic --no-input
+# Collect static files
+python manage.py collectstatic --noinput
+
+# Run migrations
 python manage.py migrate
+
+# Create superuser if it doesn't exist
+python create_superuser.py
