@@ -5,11 +5,79 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Система добровольной сертификации "Export Quality System"{% endblock %}</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    
+    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
     {% block extra_css %}{% endblock %}
+    
     <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .container {
+            padding-top: 50px;
+            padding-bottom: 50px;
+        }
+        
+        .logo-text {
+            text-align: left;
+            color: #333;
+        }
+        
+        .logo-text div:first-child {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .export-quality {
+            font-size: 24px;
+            font-weight: 700;
+            color: #dc3545;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(45deg, #dc3545, #c82333);
+            border: none;
+            border-radius: 25px;
+            padding: 12px 30px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(220, 53, 69, 0.4);
+        }
+        
+        .footer {
+            margin-top: 50px;
+            padding: 30px 0;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .certificate-details {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #dc3545;
+        }
+        
         .certificate-thumbnail {
             display: inline-block;
             margin-right: 10px;
@@ -19,6 +87,7 @@
         
         .certificate-preview {
             transition: transform 0.2s;
+            border-radius: 8px;
         }
         
         .certificate-preview:hover {
@@ -27,26 +96,6 @@
         
         .modal-xl {
             max-width: 90%;
-        }
-        body {
-            padding-top: 2rem;
-            padding-bottom: 2rem;
-            background-color: #f8f9fa;
-        }
-        .footer {
-            margin-top: 3rem;
-            padding-top: 1rem;
-            text-align: center;
-        }
-        .logo-text {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            justify-content: center;
-        }
-        .export-quality {
-            font-weight: bold;
-            margin-top: 5px;
         }
     </style>
 </head>
@@ -79,8 +128,7 @@
         </div>
     </div>
 
-    <script src="{% static 'certificates/js/jquery.min.js' %}"></script>
-    <script src="{% static 'certificates/js/bootstrap.bundle.min.js' %}"></script>
+    <!-- jQuery и Bootstrap JS из CDN -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     {% block extra_js %}{% endblock %}
