@@ -13,6 +13,12 @@ from .utils import generate_certificate_image, generate_permission_image, genera
 from django.http import HttpResponse, Http404
 from django.shortcuts import get_object_or_404
 import os
+from django.shortcuts import render, get_object_or_404
+from django.http import Http404
+from .models import Certificate
+import logging
+
+logger = logging.getLogger(__name__)
 def delete_certificate(request, certificate_id):
     certificate = get_object_or_404(Certificate, id=certificate_id)
     
@@ -75,30 +81,25 @@ def index(request):
 
 def search_results(request):
     search_query = request.GET.get('search_query', '').strip()
+    certificates = []
     
     if search_query:
-        if search_query.startswith('№'):
-            search_query = search_query[1:]
-        
-        parts = search_query.split('.')
-        
-        query = Q()
-        
-        if len(parts) == 3 and parts[0].upper() == 'SMK':
-            query |= Q(certificate_number_part__iexact=parts[1])
-        else:
-            query |= Q(certificate_number_part__icontains=search_query)
-        
-        # Добавляем prefetch_related для загрузки связанных файлов
-        certificates = Certificate.objects.filter(query).prefetch_related('auditors')
-        
-        for certificate in certificates:
-            current_status = certificate.calculate_status()
-            if certificate.status != current_status:
-                certificate.status = current_status
-                certificate.save(update_fields=['status'])
-    else:
-        certificates = Certificate.objects.none()
+        try:
+            # Поиск по номеру сертификата
+            certificates = Certificate.objects.filter(
+                certificate_number_part__icontains=search_query
+            ).select_related('iso_standard').prefetch_related('auditors')
+            
+            # Обновляем статусы найденных сертификатов
+            for certificate in certificates:
+                current_status = certificate.calculate_status()
+                if certificate.status != current_status:
+                    certificate.status = current_status
+                    certificate.save(update_fields=['status'])
+                    
+        except Exception as e:
+            logger.error(f"Ошибка при поиске сертификатов: {e}")
+            certificates = []
     
     return render(request, 'certificates/search_results.html', {
         'certificates': certificates,
@@ -106,20 +107,23 @@ def search_results(request):
     })
 
 def certificate_detail(request, certificate_id):
-    certificate = get_object_or_404(Certificate, id=certificate_id)
-    
-    # Обновляем статус сертификата
-    current_status = certificate.calculate_status()
-    if certificate.status != current_status:
-        certificate.status = current_status
-        certificate.save(update_fields=['status'])
-    
-    # Используем существующий шаблон search_results для отображения
-    return render(request, 'certificates/search_results.html', {
-        'certificates': [certificate],
-        'search_query': certificate.certificate_number_part,
-        'is_detail_view': True
-    })
+    try:
+        certificate = get_object_or_404(Certificate, id=certificate_id)
+        
+        # Обновляем статус сертификата
+        current_status = certificate.calculate_status()
+        if certificate.status != current_status:
+            certificate.status = current_status
+            certificate.save(update_fields=['status'])
+        
+        return render(request, 'certificates/search_results.html', {
+            'certificates': [certificate],
+            'search_query': certificate.certificate_number_part,
+            'is_detail_view': True
+        })
+    except Exception as e:
+        logger.error(f"Ошибка при получении сертификата {certificate_id}: {e}")
+        raise Http404("Сертификат не найден")
 
 def trigger_notifications(request):
     send_notifications_task.delay()
@@ -142,33 +146,28 @@ def audit_detail(request, certificate_id, auditor_id):
     }
     return render(request, 'certificates/audit_template.html', context)
 
+def index(request):
+    return render(request, 'certificates/index.html')
+
 def download_file(request, certificate_id, file_num):
-    """Скачивание файлов сертификата"""
     certificate = get_object_or_404(Certificate, id=certificate_id)
     
-    file_field = None
-    filename = None
+    file_mapping = {
+        1: certificate.file1,
+        2: certificate.file2,
+        3: certificate.file3
+    }
     
-    if file_num == 1 and certificate.file1:
-        file_field = certificate.file1
-        filename = f"certificate_{certificate.certificate_number_part}.{file_field.name.split('.')[-1]}"
-    elif file_num == 2 and certificate.file2:
-        file_field = certificate.file2
-        filename = f"permission_{certificate.certificate_number_part}.{file_field.name.split('.')[-1]}"
-    elif file_num == 3 and certificate.file3:
-        file_field = certificate.file3
-        filename = f"additional_{certificate.certificate_number_part}.{file_field.name.split('.')[-1]}"
-    
-    if not file_field:
-        raise Http404("Файл не найден")
+    file = file_mapping.get(file_num)
+    if not file:
+        return HttpResponse("Файл не найден", status=404)
     
     try:
-        with open(file_field.path, 'rb') as f:
-            response = HttpResponse(f.read(), content_type='application/octet-stream')
-            response['Content-Disposition'] = f'attachment; filename="{filename}"'
-            return response
-    except FileNotFoundError:
-        raise Http404("Файл не найден на сервере")
+        response = FileResponse(file.open(), as_attachment=True, filename=file.name.split('/')[-1])
+        return response
+    except Exception as e:
+        logger.error(f"Ошибка при скачивании файла: {e}")
+        return HttpResponse("Ошибка при скачивании файла", status=500)
 
 @login_required
 def admin_certificates(request):
