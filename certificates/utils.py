@@ -14,7 +14,8 @@ import os
 from django.urls import reverse
 from psd_tools import PSDImage
 # Добавить в начало файла после импортов
-
+# Настройка логгера
+logger = logging.getLogger(__name__)
 def create_qr_with_logo(data, logo_path=None, transparent_bg=True):
     """Создает QR-код с логотипом и прозрачным фоном"""
     try:
@@ -73,6 +74,48 @@ def create_qr_with_logo(data, logo_path=None, transparent_bg=True):
         logger.error(f"Ошибка при создании QR-кода с логотипом: {str(e)}")
         return None
 logger = logging.getLogger(__name__)
+
+def create_qr_with_logo(url, logo_path, transparent_bg=False):
+    """Создает QR-код с логотипом"""
+    try:
+        # Создаем QR-код
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(url)
+        qr.make(fit=True)
+        
+        # Создаем изображение QR-кода
+        if transparent_bg:
+            qr_img = qr.make_image(fill_color="black", back_color="transparent")
+        else:
+            qr_img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Если логотип существует, добавляем его
+        if os.path.exists(logo_path):
+            logo = Image.open(logo_path)
+            
+            # Вычисляем размер логотипа (не более 1/5 от размера QR-кода)
+            qr_width, qr_height = qr_img.size
+            logo_size = min(qr_width, qr_height) // 5
+            
+            # Изменяем размер логотипа
+            logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+            
+            # Вычисляем позицию для центрирования логотипа
+            logo_pos = ((qr_width - logo_size) // 2, (qr_height - logo_size) // 2)
+            
+            # Вставляем логотип
+            qr_img.paste(logo, logo_pos)
+        
+        return qr_img
+        
+    except Exception as e:
+        logger.error(f"Error creating QR code with logo: {str(e)}")
+        return None
 
 def generate_certificate_image(certificate, file1_cleared=False, file1_psd_cleared=False):
     """Генерирует изображения сертификата (PNG и PSD)"""
@@ -133,8 +176,8 @@ def generate_certificate_image(certificate, file1_cleared=False, file1_psd_clear
                 
                 elif layer.name == '%%QR%%':
                     try:
-                        # Логика для замены QR-кода требует дополнительной реализации
-                        logger.info("QR code layer found")
+                        logger.info("QR code layer found for certificate")
+                        # Здесь можно добавить логику для вставки QR-кода в слой
                     except Exception as e:
                         logger.error(f"Error adding QR code: {str(e)}")
 
