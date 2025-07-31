@@ -107,8 +107,17 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static_collected'),
 ]
 
+# Для Render - простое решение без Cloudinary
+if not DEBUG:
+    # Для продакшена на Render используем локальное хранение
+    # Render поддерживает временное хранение файлов
+    pass
+
 # WhiteNoise configuration for static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Default primary key field type
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Media files configuration for Render
 MEDIA_URL = '/media/'
