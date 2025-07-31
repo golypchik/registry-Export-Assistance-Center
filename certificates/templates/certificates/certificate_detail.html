@@ -117,38 +117,361 @@
                         </div>
                         {% endif %}
                         
+                        <!-- Добавляем секцию с файлами -->
+                        {% if certificate.file1 or certificate.file2 or certificate.file3 %}
                         <div class="row mb-3">
-                            <div class="col-md-4 fw-bold">Файлы:</div>
+                            <div class="col-md-4 fw-bold">Документы:</div>
                             <div class="col-md-8">
-                                <div class="d-flex flex-column gap-2">
+                                <div class="d-flex flex-wrap gap-3">
                                     {% if certificate.file1 %}
-                                        <a href="{% url 'download_file' certificate.id 1 %}" class="btn btn-outline-primary">
-                                            <i class="fas fa-download"></i> Скачать сертификат
-                                        </a>
+                                        <div class="certificate-thumbnail">
+                                            <img src="{% if certificate.file1.url|lower|slice:'-4:' == '.pdf' %}{% static 'certificates/img/pdf_icon.png' %}{% else %}{{ certificate.file1.url }}{% endif %}" 
+                                                alt="Сертификат" 
+                                                class="img-thumbnail certificate-preview" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#certificateModal{{ certificate.id }}1"
+                                                style="max-height: 100px; cursor: pointer;">
+                                            <div class="text-center mt-1">
+                                                <small>Сертификат</small>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Модальное окно для файла 1 -->
+                                        <div class="modal fade" id="certificateModal{{ certificate.id }}1" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-xl">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">Сертификат</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body text-center">
+                                                        {% if certificate.file1.url|lower|slice:'-4:' == '.pdf' %}
+                                                            <iframe src="{{ certificate.file1.url }}" width="100%" height="600px"></iframe>
+                                                        {% else %}
+                                                            <img src="{{ certificate.file1.url }}" class="img-fluid" alt="Сертификат">
+                                                        {% endif %}
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <a href="{{ certificate.file1.url }}" class="btn btn-danger" download>
+                                                            <i class="fas fa-download"></i> Скачать
+                                                        </a>
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     {% endif %}
+                                    
                                     {% if certificate.file2 %}
-                                        <a href="{% url 'download_file' certificate.id 2 %}" class="btn btn-outline-primary">
-                                            <i class="fas fa-download"></i> Скачать приложение
-                                        </a>
+                                        <div class="certificate-thumbnail">
+                                            <img src="{% if certificate.file2.url|lower|slice:'-4:' == '.pdf' %}{% static 'certificates/img/pdf_icon.png' %}{% else %}{{ certificate.file2.url }}{% endif %}" 
+                                                alt="Приложение" 
+                                                class="img-thumbnail certificate-preview" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#certificateModal{{ certificate.id }}2"
+                                                style="max-height: 100px; cursor: pointer;">
+                                            <div class="text-center mt-1">
+                                                <small>Приложение</small>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Модальное окно для файла 2 -->
+                                        <div class="modal fade" id="certificateModal{{ certificate.id }}2" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-xl">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">Приложение</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body text-center">
+                                                        {% if certificate.file2.url|lower|slice:'-4:' == '.pdf' %}
+                                                            <iframe src="{{ certificate.file2.url }}" width="100%" height="600px"></iframe>
+                                                        {% else %}
+                                                            <img src="{{ certificate.file2.url }}" class="img-fluid" alt="Приложение">
+                                                        {% endif %}
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <a href="{{ certificate.file2.url }}" class="btn btn-danger" download>
+                                                            <i class="fas fa-download"></i> Скачать
+                                                        </a>
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     {% endif %}
+                                    
                                     {% if certificate.file3 %}
-                                        <a href="{% url 'download_file' certificate.id 3 %}" class="btn btn-outline-primary">
-                                            <i class="fas fa-download"></i> Скачать дополнительные материалы
-                                        </a>
+                                        <div class="certificate-thumbnail">
+                                            <img src="{% if certificate.file3.url|lower|slice:'-4:' == '.pdf' %}{% static 'certificates/img/pdf_icon.png' %}{% else %}{{ certificate.file3.url }}{% endif %}" 
+                                                alt="Дополнительный файл" 
+                                                class="img-thumbnail certificate-preview" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#certificateModal{{ certificate.id }}3"
+                                                style="max-height: 100px; cursor: pointer;">
+                                            <div class="text-center mt-1">
+                                                <small>Дополнительно</small>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Модальное окно для файла 3 -->
+                                        <div class="modal fade" id="certificateModal{{ certificate.id }}3" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-xl">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">Дополнительный файл</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body text-center">
+                                                        {% if certificate.file3.url|lower|slice:'-4:' == '.pdf' %}
+                                                            <iframe src="{{ certificate.file3.url }}" width="100%" height="600px"></iframe>
+                                                        {% else %}
+                                                            <img src="{{ certificate.file3.url }}" class="img-fluid" alt="Дополнительный файл">
+                                                        {% endif %}
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <a href="{{ certificate.file3.url }}" class="btn btn-danger" download>
+                                                            <i class="fas fa-download"></i> Скачать
+                                                        </a>
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     {% endif %}
+                                    
+                                    <!-- Добавляем файлы аудиторов, если они есть -->
+                                    {% for auditor in certificate.auditors.all %}
+                                        {% if auditor.audit_file %}
+                                            <div class="certificate-thumbnail">
+                                                <img src="{% if auditor.audit_file.url|lower|slice:'-4:' == '.pdf' %}{% static 'certificates/img/pdf_icon.png' %}{% else %}{{ auditor.audit_file.url }}{% endif %}" 
+                                                    alt="Сертификат аудитора" 
+                                                    class="img-thumbnail certificate-preview" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#auditModal{{ certificate.id }}{{ forloop.counter }}"
+                                                    style="max-height: 100px; cursor: pointer;">
+                                                <div class="text-center mt-1">
+                                                    <small>Аудитор: {{ auditor.full_name }}</small>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Модальное окно для файла аудитора -->
+                                            <div class="modal fade" id="auditModal{{ certificate.id }}{{ forloop.counter }}" tabindex="-1" aria-hidden="true">
+                                                <div class="modal-dialog modal-xl">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title">Сертификат аудитора: {{ auditor.full_name }}</h5>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        </div>
+                                                        <div class="modal-body text-center">
+                                                            {% if auditor.audit_file.url|lower|slice:'-4:' == '.pdf' %}
+                                                                <iframe src="{{ auditor.audit_file.url }}" width="100%" height="600px"></iframe>
+                                                            {% else %}
+                                                                <img src="{{ auditor.audit_file.url }}" class="img-fluid" alt="Сертификат аудитора">
+                                                            {% endif %}
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <a href="{{ auditor.audit_file.url }}" class="btn btn-danger" download>
+                                                                <i class="fas fa-download"></i> Скачать
+                                                            </a>
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
+                        
+                        {% if certificate.qr_code %}
+                        <div class="row mb-3">
+                            <div class="col-md-4 fw-bold">QR-код:</div>
+                            <div class="col-md-8">
+                                <img src="{{ certificate.qr_code.url }}" alt="QR-код" class="img-thumbnail" style="max-width: 150px;">
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
-            
-            <div class="text-center mt-4">
-                <a href="{% url 'index' %}" class="btn btn-outline-secondary btn-lg">
-                    <i class="fas fa-arrow-left"></i> Вернуться к поиску
-                </a>
-            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-8 offset-md-2 text-center">
+            <a href="{% url 'search' %}" class="btn btn-danger">Вернуться к поиску</a>
         </div>
     </div>
 </div>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Обработка кликов по превью изображений
+    const certificatePreviews = document.querySelectorAll('.certificate-preview');
+    
+    certificatePreviews.forEach(function(preview) {
+        preview.addEventListener('click', function() {
+            // Добавляем эффект загрузки
+            this.style.opacity = '0.7';
+            setTimeout(() => {
+                this.style.opacity = '1';
+            }, 200);
+        });
+    });
+    
+    // Обработка модальных окон
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(function(modal) {
+        modal.addEventListener('shown.bs.modal', function() {
+            // Фокус на модальном окне для лучшей доступности
+            this.focus();
+        });
+        
+        modal.addEventListener('hidden.bs.modal', function() {
+            // Очистка фокуса после закрытия модального окна
+            document.body.focus();
+        });
+    });
+    
+    // Обработка iframe для PDF файлов
+    const iframes = document.querySelectorAll('iframe');
+    iframes.forEach(function(iframe) {
+        iframe.addEventListener('load', function() {
+            // Добавляем индикатор загрузки PDF
+            const loadingIndicator = this.parentElement.querySelector('.loading-indicator');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+            }
+        });
+        
+        // Добавляем обработку ошибок загрузки
+        iframe.addEventListener('error', function() {
+            const errorMessage = document.createElement('div');
+            errorMessage.className = 'alert alert-warning';
+            errorMessage.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Не удалось загрузить документ. <a href="' + this.src + '" target="_blank">Открыть в новой вкладке</a>';
+            this.parentElement.appendChild(errorMessage);
+            this.style.display = 'none';
+        });
+    });
+    
+    // Добавляем функциональность для печати сертификата
+    const printButton = document.createElement('button');
+    printButton.className = 'btn btn-outline-danger ms-2';
+    printButton.innerHTML = '<i class="fas fa-print"></i> Печать';
+    printButton.addEventListener('click', function() {
+        window.print();
+    });
+    
+    // Добавляем кнопку печати к кнопке "Вернуться к поиску"
+    const backButton = document.querySelector('a[href*="search"]');
+    if (backButton) {
+        backButton.parentElement.appendChild(printButton);
+    }
+    
+    // Обработка копирования номера сертификата
+    const certificateNumber = document.querySelector('.card-header h5');
+    if (certificateNumber) {
+        certificateNumber.style.cursor = 'pointer';
+        certificateNumber.title = 'Нажмите, чтобы скопировать номер сертификата';
+        
+        certificateNumber.addEventListener('click', function() {
+            const numberText = this.textContent.match(/№\s*(.+)/);
+            if (numberText && numberText[1]) {
+                navigator.clipboard.writeText(numberText[1].trim()).then(function() {
+                    // Показываем уведомление об успешном копировании
+                    const toast = document.createElement('div');
+                    toast.className = 'toast-notification';
+                    toast.innerHTML = '<i class="fas fa-check"></i> Номер сертификата скопирован';
+                    toast.style.cssText = `
+                        position: fixed;
+                        top: 20px;
+                        right: 20px;
+                        background: #28a745;
+                        color: white;
+                        padding: 10px 15px;
+                        border-radius: 5px;
+                        z-index: 9999;
+                        animation: slideIn 0.3s ease-out;
+                    `;
+                    
+                    document.body.appendChild(toast);
+                    
+                    setTimeout(() => {
+                        toast.style.animation = 'slideOut 0.3s ease-in';
+                        setTimeout(() => {
+                            document.body.removeChild(toast);
+                        }, 300);
+                    }, 2000);
+                }).catch(function() {
+                    console.log('Не удалось скопировать номер сертификата');
+                });
+            }
+        });
+    }
+    
+    // Добавляем анимации для CSS
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+        
+        .certificate-thumbnail {
+            transition: transform 0.2s ease;
+        }
+        
+        .certificate-thumbnail:hover {
+            transform: scale(1.05);
+        }
+        
+        .certificate-preview {
+            transition: all 0.2s ease;
+        }
+        
+        .certificate-preview:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        @media print {
+            .btn, .modal, .footer {
+                display: none !important;
+            }
+            
+            .container {
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            .card {
+                border: none !important;
+                box-shadow: none !important;
+            }
+            
+            .card-header {
+                background: white !important;
+                color: black !important;
+                border: 1px solid #000 !important;
+            }
+            
+            .badge {
+                border: 1px solid #000 !important;
+                background: white !important;
+                color: black !important;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+});
+</script>
 {% endblock %}
