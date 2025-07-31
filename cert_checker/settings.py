@@ -10,15 +10,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-your-secret-key-here-change-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=False, cast=bool)
+DEBUG = config('DEBUG', default=True, cast=bool)  # Изменено на True для локальной разработки
 
-# Разрешенные хосты для Render
-ALLOWED_HOSTS = ['*']  # Для Render можно использовать *
+# Разрешенные хосты
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
 
 # Render.com specific
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
-    ALLOWED_HOSTS = [RENDER_EXTERNAL_HOSTNAME, 'localhost', '127.0.0.1']
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    DEBUG = False  # Отключаем DEBUG для продакшена
 
 # Application definition
 INSTALLED_APPS = [
@@ -107,19 +108,13 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static_collected'),
 ]
 
-# Для Render - простое решение без Cloudinary
-if not DEBUG:
-    # Для продакшена на Render используем локальное хранение
-    # Render поддерживает временное хранение файлов
-    pass
-
 # WhiteNoise configuration for static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Default primary key field type
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# URL сайта для QR-кодов
+SITE_URL = os.environ.get('SITE_URL', 'https://registry-export-assistance-center.onrender.com')
 
-# Media files configuration for Render
+# Media files configuration
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
@@ -139,8 +134,8 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'info@export-center.ru
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 
-# Настройки для Render
-if 'RENDER' in os.environ:
+# Настройки для Render (только в продакшене)
+if RENDER_EXTERNAL_HOSTNAME:
     # Настройки безопасности для продакшена
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = True
@@ -210,4 +205,8 @@ else:
     CELERY_TASK_ALWAYS_EAGER = True
     CELERY_TASK_EAGER_PROPAGATES = True
 
-SITE_URL = 'https://registry-export-assistance-center.onrender.com'
+# Site URL configuration
+if RENDER_EXTERNAL_HOSTNAME:
+    SITE_URL = f'https://{RENDER_EXTERNAL_HOSTNAME}'
+else:
+    SITE_URL = 'http://127.0.0.1:8000'
