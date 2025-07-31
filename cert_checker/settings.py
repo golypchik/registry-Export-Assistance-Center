@@ -200,3 +200,5 @@ else:
     # Отключаем Celery если Redis недоступен
     CELERY_TASK_ALWAYS_EAGER = True
     CELERY_TASK_EAGER_PROPAGATES = True
+
+SITE_URL = 'https://registry-export-assistance-center.onrender.com'

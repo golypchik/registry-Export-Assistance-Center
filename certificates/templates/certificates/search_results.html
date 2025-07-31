@@ -1,6 +1,5 @@
 {% extends 'certificates/base.html' %}
 {% load static %}
-{% load certificate_filters %}
 
 {% block title %}Результаты поиска{% endblock %}
 
@@ -25,21 +24,20 @@
         max-width: 90%;
     }
     
-    /* Добавляем стили для изображений в модальных окнах */
     .modal-body img.img-fluid {
-        max-height: 90vh; /* 90% высоты экрана */
+        max-height: 90vh;
         max-width: 100%;
         object-fit: contain;
         margin: 0 auto;
         display: block;
     }
     
-    /* Стили для PDF в модальных окнах */
     .modal-body iframe {
-        height: 90vh; /* 90% высоты экрана */
+        height: 90vh;
         width: 100%;
     }
 </style>
+
 <div class="container">
     <div class="row mb-4">
         <div class="col-md-8 offset-md-2 text-center">
@@ -137,37 +135,32 @@
                                         с {{ certificate.start_date|date:"d.m.Y" }} по {{ certificate.expiry_date|date:"d.m.Y" }}
                                     </div>
                                 </div>
+                                
+                                <!-- Добавляем секцию с файлами -->
+                                {% if certificate.file1 or certificate.file2 or certificate.file3 %}
                                 <div class="row mb-3">
-                                    <div class="col-md-4 fw-bold">Уведомления:</div>
-                                    <div class="col-md-8">
-                                        {% if certificate.notifications_enabled %}
-                                            <span class="badge bg-success"><i class="fas fa-check"></i> Подключены</span>
-                                        {% else %}
-                                            <span class="badge bg-danger"><i class="fas fa-times"></i> Отключены</span>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                               <div class="row mb-3">
-                                    <div class="col-md-4 fw-bold">Сертификаты и аудиты:</div>
+                                    <div class="col-md-4 fw-bold">Документы:</div>
                                     <div class="col-md-8">
                                         <div class="d-flex flex-wrap gap-3">
                                             {% if certificate.file1 %}
                                                 <div class="certificate-thumbnail">
                                                     <img src="{% if certificate.file1.url|lower|slice:'-4:' == '.pdf' %}{% static 'certificates/img/pdf_icon.png' %}{% else %}{{ certificate.file1.url }}{% endif %}" 
-                                                        alt="Сертификат 1" 
+                                                        alt="Сертификат" 
                                                         class="img-thumbnail certificate-preview" 
                                                         data-bs-toggle="modal" 
                                                         data-bs-target="#certificateModal{{ certificate.id }}1"
                                                         style="max-height: 100px; cursor: pointer;">
-                                                    <div class="text-center mt-1">Сертификат соответствия</div>
+                                                    <div class="text-center mt-1">
+                                                        <small>Сертификат</small>
+                                                    </div>
                                                 </div>
                                                 
-                                                <!-- Модальное окно для сертификата 1 -->
+                                                <!-- Модальное окно для файла 1 -->
                                                 <div class="modal fade" id="certificateModal{{ certificate.id }}1" tabindex="-1" aria-hidden="true">
                                                     <div class="modal-dialog modal-xl">
                                                         <div class="modal-content">
                                                             <div class="modal-header">
-                                                                <h5 class="modal-title">Сертификат соответствия</h5>
+                                                                <h5 class="modal-title">Сертификат</h5>
                                                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                             </div>
                                                             <div class="modal-body text-center">
@@ -178,7 +171,9 @@
                                                                 {% endif %}
                                                             </div>
                                                             <div class="modal-footer">
-                                                                <a href="{{ certificate.file1.url }}" class="btn btn-danger" download>Скачать</a>
+                                                                <a href="{{ certificate.file1.url }}" class="btn btn-danger" download>
+                                                                    <i class="fas fa-download"></i> Скачать
+                                                                </a>
                                                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
                                                             </div>
                                                         </div>
@@ -194,33 +189,37 @@
                                                         data-bs-toggle="modal" 
                                                         data-bs-target="#certificateModal{{ certificate.id }}2"
                                                         style="max-height: 100px; cursor: pointer;">
-                                                    <div class="text-center mt-1">Разрешение</div>
+                                                    <div class="text-center mt-1">
+                                                        <small>Приложение</small>
+                                                    </div>
                                                 </div>
                                                 
-                                                <!-- Модальное окно для сертификата 2 -->
+                                                <!-- Модальное окно для файла 2 -->
                                                 <div class="modal fade" id="certificateModal{{ certificate.id }}2" tabindex="-1" aria-hidden="true">
                                                     <div class="modal-dialog modal-xl">
                                                         <div class="modal-content">
                                                             <div class="modal-header">
-                                                                <h5 class="modal-title">Разрешение</h5>
+                                                                <h5 class="modal-title">Приложение</h5>
                                                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                             </div>
                                                             <div class="modal-body text-center">
                                                                 {% if certificate.file2.url|lower|slice:'-4:' == '.pdf' %}
                                                                     <iframe src="{{ certificate.file2.url }}" width="100%" height="600px"></iframe>
                                                                 {% else %}
-                                                                    <img src="{{ certificate.file2.url }}" class="img-fluid" alt="Разрешение">
+                                                                    <img src="{{ certificate.file2.url }}" class="img-fluid" alt="Приложение">
                                                                 {% endif %}
                                                             </div>
                                                             <div class="modal-footer">
-                                                                <a href="{{ certificate.file2.url }}" class="btn btn-danger" download>Скачать</a>
+                                                                <a href="{{ certificate.file2.url }}" class="btn btn-danger" download>
+                                                                    <i class="fas fa-download"></i> Скачать
+                                                                </a>
                                                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             {% endif %}
-
+                                            
                                             {% if certificate.file3 %}
                                                 <div class="certificate-thumbnail">
                                                     <img src="{% if certificate.file3.url|lower|slice:'-4:' == '.pdf' %}{% static 'certificates/img/pdf_icon.png' %}{% else %}{{ certificate.file3.url }}{% endif %}" 
@@ -229,10 +228,12 @@
                                                         data-bs-toggle="modal" 
                                                         data-bs-target="#certificateModal{{ certificate.id }}3"
                                                         style="max-height: 100px; cursor: pointer;">
-                                                    <div class="text-center mt-1">Дополнительный файл</div>
+                                                    <div class="text-center mt-1">
+                                                        <small>Дополнительно</small>
+                                                    </div>
                                                 </div>
                                                 
-                                                <!-- Модальное окно для сертификата 3 -->
+                                                <!-- Модальное окно для файла 3 -->
                                                 <div class="modal fade" id="certificateModal{{ certificate.id }}3" tabindex="-1" aria-hidden="true">
                                                     <div class="modal-dialog modal-xl">
                                                         <div class="modal-content">
@@ -244,56 +245,67 @@
                                                                 {% if certificate.file3.url|lower|slice:'-4:' == '.pdf' %}
                                                                     <iframe src="{{ certificate.file3.url }}" width="100%" height="600px"></iframe>
                                                                 {% else %}
-                                                                    <img src="{{ certificate.file3.url }}" class="img-fluid" alt="Сертификат аудитора">
+                                                                    <img src="{{ certificate.file3.url }}" class="img-fluid" alt="Дополнительный файл">
                                                                 {% endif %}
                                                             </div>
                                                             <div class="modal-footer">
-                                                                <a href="{{ certificate.file3.url }}" class="btn btn-danger" download>Скачать</a>
+                                                                <a href="{{ certificate.file3.url }}" class="btn btn-danger" download>
+                                                                    <i class="fas fa-download"></i> Скачать
+                                                                </a>
                                                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             {% endif %}
+                                            
+                                            <!-- Добавляем файлы аудиторов, если они есть -->
                                             {% for auditor in certificate.auditors.all %}
                                                 {% if auditor.audit_file %}
                                                     <div class="certificate-thumbnail">
                                                         <img src="{% if auditor.audit_file.url|lower|slice:'-4:' == '.pdf' %}{% static 'certificates/img/pdf_icon.png' %}{% else %}{{ auditor.audit_file.url }}{% endif %}" 
-                                                            alt="Аудит {{ forloop.counter }}" 
+                                                            alt="Сертификат аудитора" 
                                                             class="img-thumbnail certificate-preview" 
                                                             data-bs-toggle="modal" 
                                                             data-bs-target="#auditModal{{ certificate.id }}{{ forloop.counter }}"
                                                             style="max-height: 100px; cursor: pointer;">
-                                                        <div class="text-center mt-1">Сертификат соответствия аудитора {{ forloop.counter }}</div>
+                                                        <div class="text-center mt-1">
+                                                            <small>Сертификат аудитора {{ forloop.counter }}</small>
+                                                        </div>
                                                     </div>
                                                     
-                                                    <!-- Модальное окно для аудита -->
+                                                    <!-- Модальное окно для файла аудитора -->
                                                     <div class="modal fade" id="auditModal{{ certificate.id }}{{ forloop.counter }}" tabindex="-1" aria-hidden="true">
                                                         <div class="modal-dialog modal-xl">
                                                             <div class="modal-content">
                                                                 <div class="modal-header">
-                                                                    <h5 class="modal-title">Сертификат соответствия аудитора {{ forloop.counter }}</h5>
+                                                                    <h5 class="modal-title">Сертификат аудитора {{ forloop.counter }}</h5>
                                                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                                 </div>
                                                                 <div class="modal-body text-center">
                                                                     {% if auditor.audit_file.url|lower|slice:'-4:' == '.pdf' %}
                                                                         <iframe src="{{ auditor.audit_file.url }}" width="100%" height="600px"></iframe>
                                                                     {% else %}
-                                                                        <img src="{{ auditor.audit_file.url }}" class="img-fluid" alt="Аудит {{ forloop.counter }}">
+                                                                        <img src="{{ auditor.audit_file.url }}" class="img-fluid" alt="Сертификат аудитора">
                                                                     {% endif %}
                                                                 </div>
                                                                 <div class="modal-footer">
-                                                                    <a href="{{ auditor.audit_file.url }}" class="btn btn-danger" download>Скачать</a>
+                                                                    <a href="{{ auditor.audit_file.url }}" class="btn btn-danger" download>
+                                                                        <i class="fas fa-download"></i> Скачать
+                                                                    </a>
                                                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 {% endif %}
-                                           {% endfor %}
+                                            {% endfor %}
                                         </div>
                                     </div>
                                 </div>
+                                {% endif %}
+                            </div>
+                            
                             {% if not forloop.last %}
                                 <hr class="my-4">
                             {% endif %}
@@ -303,13 +315,16 @@
                             <i class="fas fa-info-circle"></i> По вашему запросу ничего не найдено. Пожалуйста, проверьте правильность ввода номера сертификата.
                         </div>
                     {% endif %}
-                    </div>
-                </div>  
-                <div class="text-center mt-4">
-                    <a href="{% url 'index' %}" class="btn btn-outline-secondary btn-lg">
-                        <i class="fas fa-arrow-left"></i> Вернуться к поиску
-                    </a>
                 </div>
-                {% endblock %}
+            </div>
+            
+            <div class="text-center mt-4">
+                <a href="{% url 'index' %}" class="btn btn-outline-secondary btn-lg">
+                    <i class="fas fa-arrow-left"></i> Вернуться к поиску
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
 
-                                        

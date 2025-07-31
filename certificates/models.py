@@ -1,4 +1,4 @@
-
+from django.core.files.base import ContentFile
 from django.conf import settings
 import os
 import logging
@@ -9,6 +9,9 @@ from django.utils.functional import cached_property
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from dateutil.relativedelta import relativedelta
+import qrcode
+from PIL import Image
+from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
@@ -177,27 +180,25 @@ class Certificate(models.Model):
     def _generate_qr_code(self):
         """Генерирует QR-код с логотипом и прозрачным фоном"""
         try:
-            import qrcode
-            from PIL import Image, ImageDraw
-            from django.conf import settings
-            from django.core.files.base import ContentFile
-            from io import BytesIO
-            import os
+            # Проверяем, что у объекта есть ID
+            if not self.id:
+                logger.warning("Невозможно сгенерировать QR-код: объект не сохранен")
+                return False
             
             # Создаем QR-код
             qr = qrcode.QRCode(
                 version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_H,  # Высокий уровень коррекции для логотипа
+                error_correction=qrcode.constants.ERROR_CORRECT_H,
                 box_size=10,
                 border=4,
             )
             
             # URL для QR-кода
-            url = f"{settings.SITE_URL}/certificate/{self.id}/"
+            url = f"{getattr(settings, 'SITE_URL', 'https://registry-export-assistance-center.onrender.com')}/certificate/{self.id}/"
             qr.add_data(url)
             qr.make(fit=True)
             
-            # Создаем изображение QR-кода с прозрачным фоном
+            # Создаем изображение QR-кода
             qr_img = qr.make_image(fill_color="black", back_color="white")
             qr_img = qr_img.convert("RGBA")
             
@@ -205,58 +206,70 @@ class Certificate(models.Model):
             data = qr_img.getdata()
             new_data = []
             for item in data:
-                # Если пиксель белый (255, 255, 255), делаем его прозрачным
                 if item[0] == 255 and item[1] == 255 and item[2] == 255:
                     new_data.append((255, 255, 255, 0))  # Прозрачный
                 else:
-                    new_data.append(item)  # Оставляем как есть
+                    new_data.append(item)
             
             qr_img.putdata(new_data)
             
-            # Загружаем логотип
+            # Пытаемся загрузить логотип
             logo_path = os.path.join(settings.BASE_DIR, 'certificates', 'static', 'certificates', 'img', 'company_logo.png')
             if os.path.exists(logo_path):
-                logo = Image.open(logo_path)
-                
-                # Вычисляем размер логотипа (увеличиваем до 1/3 от размера QR-кода)
-                qr_width, qr_height = qr_img.size
-                logo_size = min(qr_width, qr_height) // 3
-                
-                # Изменяем размер логотипа
-                logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
-                
-                # Если логотип не имеет альфа-канала, добавляем его
-                if logo.mode != 'RGBA':
-                    logo = logo.convert('RGBA')
-                
-                # Создаем белый квадратный фон для логотипа
-                padding = 10
-                logo_bg_size = logo_size + (padding * 2)
-                logo_bg = Image.new('RGBA', (logo_bg_size, logo_bg_size), (255, 255, 255, 255))
-                
-                # Вычисляем позицию для размещения логотипа в центре QR-кода
-                logo_bg_pos = ((qr_width - logo_bg_size) // 2, (qr_height - logo_bg_size) // 2)
-                logo_pos = (padding, padding)
-                
-                # Накладываем белый квадратный фон на QR-код
-                qr_img.paste(logo_bg, logo_bg_pos, logo_bg)
-                
-                # Накладываем логотип на белый фон
-                logo_final_pos = (logo_bg_pos[0] + logo_pos[0], logo_bg_pos[1] + logo_pos[1])
-                qr_img.paste(logo, logo_final_pos, logo)
+                try:
+                    logo = Image.open(logo_path)
+                    
+                    # Вычисляем размер логотипа
+                    qr_width, qr_height = qr_img.size
+                    logo_size = min(qr_width, qr_height) // 3
+                    
+                    # Изменяем размер логотипа
+                    logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+                    
+                    # Конвертируем в RGBA если нужно
+                    if logo.mode != 'RGBA':
+                        logo = logo.convert('RGBA')
+                    
+                    # Создаем белый фон для логотипа
+                    padding = 10
+                    logo_bg_size = logo_size + (padding * 2)
+                    logo_bg = Image.new('RGBA', (logo_bg_size, logo_bg_size), (255, 255, 255, 255))
+                    
+                    # Позиционируем логотип
+                    logo_bg_pos = ((qr_width - logo_bg_size) // 2, (qr_height - logo_bg_size) // 2)
+                    logo_pos = (padding, padding)
+                    
+                    # Накладываем фон и логотип
+                    qr_img.paste(logo_bg, logo_bg_pos, logo_bg)
+                    logo_final_pos = (logo_bg_pos[0] + logo_pos[0], logo_bg_pos[1] + logo_pos[1])
+                    qr_img.paste(logo, logo_final_pos, logo)
+                    
+                except Exception as e:
+                    logger.warning(f"Не удалось добавить логотип к QR-коду: {e}")
+            else:
+                logger.info(f"Логотип не найден по пути: {logo_path}")
             
             # Сохраняем QR-код
             buffer = BytesIO()
             qr_img.save(buffer, format='PNG')
             buffer.seek(0)
             
+            # Удаляем старый QR-код если есть
+            if self.qr_code:
+                try:
+                    if os.path.isfile(self.qr_code.path):
+                        os.remove(self.qr_code.path)
+                except (ValueError, OSError):
+                    pass
+            
             filename = f'qr_code_{self.id}.png'
             self.qr_code.save(filename, ContentFile(buffer.getvalue()), save=False)
             
+            logger.info(f"QR-код успешно сгенерирован для сертификата {self.id}")
             return True
             
         except Exception as e:
-            print(f"Ошибка при генерации QR-кода: {e}")
+            logger.error(f"Ошибка при генерации QR-кода для сертификата {self.id}: {e}")
             return False
     
     def save(self, *args, **kwargs):
@@ -282,8 +295,12 @@ class Certificate(models.Model):
         
         # Генерируем QR-код для новых сертификатов или если он отсутствует
         if is_new or not self.qr_code:
-            if self._generate_qr_code():
-                super().save(update_fields=['qr_code'])
+            try:
+                if self._generate_qr_code():
+                    # Сохраняем только поле qr_code, чтобы избежать рекурсии
+                    Certificate.objects.filter(pk=self.pk).update(qr_code=self.qr_code.name)
+            except Exception as e:
+                logger.error(f"Ошибка при сохранении QR-кода: {e}")
     def delete(self, *args, **kwargs):
         """Удаление сертификата с очисткой всех связанных файлов"""
         # Удаление файлов сертификата
