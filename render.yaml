@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: cert-checker
+    env: python
+    buildCommand: "./build.sh"
+    startCommand: "cd cert_checker && gunicorn cert_checker.wsgi:application"
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cert-checker-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: RENDER
+        value: "true"
+
+databases:
+  - name: cert-checker-db
+    plan: free
