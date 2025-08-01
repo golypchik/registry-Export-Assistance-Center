@@ -76,7 +76,7 @@ class Certificate(models.Model):
     file2_psd = models.FileField(upload_to='permissions/', null=True, blank=True, verbose_name="Разрешение (PSD)")
     file3 = models.FileField('Дополнительный файл', upload_to='certificates/', null=True, blank=True)
     
-    # Удаляем дублирующиеся поля для очистки файлов - оставляем только clear_*
+    # Поля для очистки файлов
     clear_file1 = models.BooleanField(default=False)
     clear_file1_psd = models.BooleanField(default=False)
     clear_file2 = models.BooleanField(default=False)
@@ -143,9 +143,10 @@ class Certificate(models.Model):
         """Безопасное удаление файла"""
         if file_field:
             try:
-                if os.path.isfile(file_field.path):
+                if hasattr(file_field, 'path') and os.path.isfile(file_field.path):
                     os.remove(file_field.path)
-            except (ValueError, OSError) as e:
+                    logger.info(f"Файл {file_field.path} успешно удален")
+            except (ValueError, OSError, AttributeError) as e:
                 logger.warning(f"Не удалось удалить файл {file_field}: {e}")
     
     def _handle_file_clearing(self):
@@ -174,8 +175,6 @@ class Certificate(models.Model):
             self._delete_file_if_exists(self.file3)
             self.file3 = None
             self.clear_file3 = False
-    
-    
     
     def _generate_qr_code(self):
         """Генерирует QR-код с логотипом и прозрачным фоном"""
@@ -256,11 +255,7 @@ class Certificate(models.Model):
             
             # Удаляем старый QR-код если есть
             if self.qr_code:
-                try:
-                    if os.path.isfile(self.qr_code.path):
-                        os.remove(self.qr_code.path)
-                except (ValueError, OSError):
-                    pass
+                self._delete_file_if_exists(self.qr_code)
             
             filename = f'qr_code_{self.id}.png'
             self.qr_code.save(filename, ContentFile(buffer.getvalue()), save=False)
@@ -301,6 +296,7 @@ class Certificate(models.Model):
                     Certificate.objects.filter(pk=self.pk).update(qr_code=self.qr_code.name)
             except Exception as e:
                 logger.error(f"Ошибка при сохранении QR-кода: {e}")
+    
     def delete(self, *args, **kwargs):
         """Удаление сертификата с очисткой всех связанных файлов"""
         # Удаление файлов сертификата
@@ -311,7 +307,6 @@ class Certificate(models.Model):
         self._delete_file_if_exists(self.file3)
         self._delete_file_if_exists(self.qr_code)
         
-
         # Удаление файлов аудиторов
         for auditor in self.auditors.all():
             auditor.delete()  # Это вызовет метод delete() аудитора
@@ -345,54 +340,79 @@ class Certificate(models.Model):
 
 
 class Auditor(models.Model):
-    certificate = models.ForeignKey(Certificate, on_delete=models.CASCADE, related_name='auditors')
-    full_name = models.CharField(max_length=255, verbose_name="ФИО аудитора")
-    audit_file = models.FileField(upload_to='audit_files/', null=True, blank=True, verbose_name="Файл аудита")
-    audit_file_psd = models.FileField(upload_to='audit_files/', null=True, blank=True, verbose_name="Файл аудита (PSD)")
-    audit_number = models.CharField(max_length=20, blank=True, verbose_name="Номер аудита")
-    generated_audit_image = models.ImageField(upload_to='audit_images/', blank=True, null=True, verbose_name="Сгенерированное изображение аудита")
-
-    def __str__(self):
-        return f"{self.full_name} - {self.certificate.full_certificate_number}"
-
-    def _delete_file_if_exists(self, file_field):
-        """Безопасное удаление файла"""
-        if file_field:
-            try:
-                if os.path.isfile(file_field.path):
-                    os.remove(file_field.path)
-            except (ValueError, OSError) as e:
-                logger.warning(f"Не удалось удалить файл {file_field}: {e}")
-
+    certificate = models.ForeignKey(Certificate, on_delete=models.CASCADE, related_name='auditors', verbose_name='Сертификат')
+    audit_number = models.CharField(max_length=50, verbose_name='Номер аудита', blank=True)
+    auditor_name = models.CharField(max_length=255, verbose_name='ФИО аудитора')
+    audit_date = models.DateField(verbose_name='Дата аудита')
+    audit_type = models.CharField(max_length=50, verbose_name='Тип аудита', choices=[
+        ('initial', 'Первоначальный'),
+        ('surveillance', 'Надзорный'),
+        ('recertification', 'Ресертификация'),
+    ])
+    audit_result = models.CharField(max_length=50, verbose_name='Результат аудита', choices=[
+        ('passed', 'Пройден'),
+        ('failed', 'Не пройден'),
+        ('conditional', 'Условно пройден'),
+    ])
+    notes = models.TextField(verbose_name='Примечания', blank=True)
+    
+    # Файлы аудита
+    audit_file1 = models.FileField(upload_to='audit_files/', blank=True, null=True, verbose_name='Файл аудита 1')
+    audit_file2 = models.FileField(upload_to='audit_files/', blank=True, null=True, verbose_name='Файл аудита 2')
+    audit_file3 = models.FileField(upload_to='audit_files/', blank=True, null=True, verbose_name='Файл аудита 3')
+    
+    # Изображения аудита
+    audit_image1 = models.ImageField(upload_to='audit_images/', blank=True, null=True, verbose_name='Изображение аудита 1')
+    audit_image2 = models.ImageField(upload_to='audit_images/', blank=True, null=True, verbose_name='Изображение аудита 2')
+    audit_image3 = models.ImageField(upload_to='audit_images/', blank=True, null=True, verbose_name='Изображение аудита 3')
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Дата обновления')
+    
     def save(self, *args, **kwargs):
         if not self.audit_number:
             self.audit_number = self.certificate.generate_audit_number()
         super().save(*args, **kwargs)
-
+    
     def delete(self, *args, **kwargs):
-        """Удаление аудитора с очисткой файлов"""
-        self._delete_file_if_exists(self.audit_file)
-        self._delete_file_if_exists(self.audit_file_psd)
-        self._delete_file_if_exists(self.generated_audit_image)
+        """Удаление аудитора с очисткой всех связанных файлов"""
+        # Удаление файлов аудита
+        files_to_delete = [
+            self.audit_file1, self.audit_file2, self.audit_file3,
+            self.audit_image1, self.audit_image2, self.audit_image3
+        ]
+        
+        for file_field in files_to_delete:
+            if file_field:
+                try:
+                    if hasattr(file_field, 'path') and os.path.isfile(file_field.path):
+                        os.remove(file_field.path)
+                        logger.info(f"Файл {file_field.path} успешно удален")
+                except (ValueError, OSError, AttributeError) as e:
+                    logger.warning(f"Не удалось удалить файл {file_field}: {e}")
+        
         super().delete(*args, **kwargs)
-
+    
+    def __str__(self):
+        return f"{self.audit_number} - {self.auditor_name}"
+    
     class Meta:
         verbose_name = 'Аудитор'
         verbose_name_plural = 'Аудиторы'
-        ordering = ['full_name']
+        ordering = ['-audit_date']
 
 
-# Сигналы для автоматической очистки файлов при удалении
 @receiver(pre_delete, sender=Certificate)
-def certificate_delete_files(sender, instance, **kwargs):
+def certificate_pre_delete(sender, instance, **kwargs):
     """Сигнал для удаления файлов при удалении сертификата"""
     # Этот сигнал можно использовать как дополнительную защиту
     # если метод delete() по какой-то причине не сработает
     pass
 
+
 @receiver(pre_delete, sender=Auditor)
-def auditor_delete_files(sender, instance, **kwargs):
+def auditor_pre_delete(sender, instance, **kwargs):
     """Сигнал для удаления файлов при удалении аудитора"""
     # Этот сигнал можно использовать как дополнительную защиту
     # если метод delete() по какой-то причине не сработает
-    pass    
+    pass
