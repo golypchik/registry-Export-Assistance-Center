@@ -6,8 +6,9 @@ echo "Starting build process..."
 echo "Installing Python dependencies..."
 pip install -r requirements.txt
 
-echo "Changing to project directory..."
-cd cert_checker
+echo "Current directory is the project root..."
+echo "Current directory contents:"
+ls -la
 
 echo "Making migrations..."
 python manage.py makemigrations --no-input

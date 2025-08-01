@@ -3,7 +3,7 @@ services:
     name: cert-checker
     env: python
     buildCommand: "./build.sh"
-    startCommand: "cd cert_checker && gunicorn cert_checker.wsgi:application"
+    startCommand: "gunicorn cert_checker.wsgi:application"
     plan: free
     envVars:
       - key: DATABASE_URL
