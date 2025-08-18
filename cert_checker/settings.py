@@ -112,7 +112,7 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files configuration for Render
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -129,6 +129,7 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'info@export-center.ru
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
+
 
 
 # Настройки для Render
@@ -148,9 +149,23 @@ if 'RENDER' in os.environ:
     
     # Настройки медиа файлов для Render Disk
     MEDIA_ROOT = '/opt/render/project/media'
+    
+    # Убедимся, что папка существует
+    import os
+    try:
+        os.makedirs(MEDIA_ROOT, exist_ok=True)
+        # Проверим права на запись
+        test_file = os.path.join(MEDIA_ROOT, '.test')
+        with open(test_file, 'w') as f:
+            f.write('test')
+        os.remove(test_file)
+    except Exception as e:
+        print(f"Ошибка создания папки медиа: {e}")
 else:
     # Локальная разработка
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+    import os
+    os.makedirs(MEDIA_ROOT, exist_ok=True)
 
 # Logging Configuration
 LOGGING = {

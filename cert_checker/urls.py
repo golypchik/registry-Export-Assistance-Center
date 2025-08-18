@@ -9,26 +9,28 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 # Импорты Django
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.static import serve
 
-from certificates import views as certificate_views
+# Создаем views для главного приложения
+from . import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('certificates.urls')),
-    path('trigger-notifications/', certificate_views.trigger_notifications, name='trigger_notifications'),
-    path('certificate/<int:certificate_id>/delete-file/', certificate_views.delete_certificate_file, name='delete_certificate_file'),
-    
 ]
 
-# Serve static and media files in development and production
+# Обслуживание файлов
 if settings.DEBUG:
+    # В режиме разработки
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 else:
-    # For production, add static files serving
+    # В продакшене - защищенное обслуживание медиа файлов
+    urlpatterns += [
+        re_path(r'^media/(?P<path>.*)$', views.protected_media, name='media'),
+    ]
+    # Статические файлы обслуживаются через WhiteNoise
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-    

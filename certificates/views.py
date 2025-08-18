@@ -10,7 +10,22 @@ from .models import Certificate, ISOStandard, Auditor
 from .tasks import send_notifications_task
 from .forms import CertificateForm, AuditorFormSet
 from .utils import generate_certificate_image, generate_permission_image, generate_audit_image
+import os
+from django.http import HttpResponse, Http404
+from django.conf import settings
+from django.views.static import serve
+from django.contrib.auth.decorators import login_required
 
+@login_required
+def protected_media(request, path):
+    """
+    Защищенное обслуживание медиа файлов
+    """
+    try:
+        return serve(request, path, document_root=settings.MEDIA_ROOT)
+    except Exception:
+        raise Http404("Файл не найден")
+    
 def delete_certificate(request, certificate_id):
     certificate = get_object_or_404(Certificate, id=certificate_id)
     
