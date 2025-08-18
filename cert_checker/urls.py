@@ -15,9 +15,15 @@ from django.conf.urls.static import static
 
 # Импорт views из приложения certificates
 from certificates import views
+from django.contrib import admin
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 from django.http import HttpResponse
+from django.views.decorators.http import require_GET
 from django.views.generic import TemplateView
 
+@require_GET
 def robots_txt(request):
     lines = [
         "User-agent: *",
@@ -25,8 +31,12 @@ def robots_txt(request):
         "",
         f"Sitemap: {request.build_absolute_uri('/sitemap.xml')}",
         "",
-        "Disallow: /admin/",
-        "Disallow: /static/admin/",
+        "# Дополнительные директивы для поисковых систем",
+        "User-agent: Googlebot",
+        "Allow: /",
+        "",
+        "User-agent: Yandex", 
+        "Allow: /",
     ]
     return HttpResponse("\n".join(lines), content_type="text/plain")
 
