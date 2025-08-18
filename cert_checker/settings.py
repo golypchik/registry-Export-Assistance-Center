@@ -130,6 +130,7 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'info@export-center.ru
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 
+
 # Настройки для Render
 if 'RENDER' in os.environ:
     # Настройки безопасности для продакшена
@@ -144,6 +145,12 @@ if 'RENDER' in os.environ:
     # Настройки для работы с прокси
     USE_X_FORWARDED_HOST = True
     USE_X_FORWARDED_PORT = True
+    
+    # Настройки медиа файлов для Render Disk
+    MEDIA_ROOT = '/opt/render/project/media'
+else:
+    # Локальная разработка
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Logging Configuration
 LOGGING = {
