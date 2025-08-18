@@ -6,18 +6,50 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Система добровольной сертификации "Export Quality System"{% endblock %}</title>
     
+     <!-- SEO мета-теги -->
+    <meta name="description" content="{% block description %}Система добровольной сертификации Export Quality System - проверка действительности сертификатов соответствия{% endblock %}">
+    <meta name="keywords" content="{% block keywords %}сертификат соответствия, Export Quality System, проверка сертификата, реестр сертификатов, ISO стандарты, система менеджмента качества, добровольная сертификация{% endblock %}">
+    <meta name="author" content="ООО Центр содействия экспорту">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Open Graph для социальных сетей -->
+    <meta property="og:title" content="{% block og_title %}Система добровольной сертификации Export Quality System{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Официальный реестр сертификатов системы добровольной сертификации Export Quality System{% endblock %}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ request.build_absolute_uri }}">
+    <meta property="og:image" content="{% static 'certificates/img/logo1.png' %}">
+    <meta property="og:locale" content="ru_RU">
+
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="{% static 'certificates/img/favicon.ico' %}">
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'certificates/img/favicon.ico' %}">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'certificates/img/favicon-32x32.png' %}">
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'certificates/img/favicon-16x16.png' %}">
+    <!-- Canonical URL -->
+    <link rel="canonical" href="{{ request.build_absolute_uri }}">
+    
+
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
     {% block extra_css %}{% endblock %}
-    
+    <!-- Структурированные данные JSON-LD -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "ООО Центр содействия экспорту",
+        "description": "Система добровольной сертификации Export Quality System",
+        "url": "{{ request.build_absolute_uri }}",
+        "logo": "{% static 'certificates/img/logo1.png' %}",
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "customer service"
+        }
+    }
+    </script>
     <style>
         body {
             background: linear-gradient(135deg, #ffffff 0%, #ec9f9f 100%);

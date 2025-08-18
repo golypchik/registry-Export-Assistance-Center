@@ -15,10 +15,26 @@ from django.conf.urls.static import static
 
 # Импорт views из приложения certificates
 from certificates import views
+from django.http import HttpResponse
+from django.views.generic import TemplateView
+
+def robots_txt(request):
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        "",
+        f"Sitemap: {request.build_absolute_uri('/sitemap.xml')}",
+        "",
+        "Disallow: /admin/",
+        "Disallow: /static/admin/",
+    ]
+    return HttpResponse("\n".join(lines), content_type="text/plain")
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('certificates.urls')),
+    path('robots.txt', robots_txt),
+    path('sitemap.xml', TemplateView.as_view(template_name='sitemap.xml', content_type='application/xml')),
 ]
 
 # Обслуживание файлов

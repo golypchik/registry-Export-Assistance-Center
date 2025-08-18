@@ -1,32 +1,126 @@
 {% extends 'certificates/base.html' %}
 {% load static %}
 
-{% block title %}Система добровольной сертификации "Export Quality System"{% endblock %}
+{% block title %}Проверка сертификатов - Система добровольной сертификации Export Quality System{% endblock %}
+
+{% block description %}Официальная проверка действительности сертификатов соответствия системы Export Quality System. Введите номер сертификата для поиска в реестре.{% endblock %}
+
+{% block keywords %}проверка сертификата, номер сертификата, Export Quality System, сертификат соответствия, реестр сертификатов{% endblock %}
 
 {% block content %}
 <div class="container">
     <div class="row mb-5">
         <div class="col-md-8 offset-md-2 text-center">
             <div class="d-flex justify-content-center align-items-center mb-4">
-                <img src="{% static 'certificates/img/logo1.png' %}" alt="Export Quality System" class="img-fluid me-3" style="max-height: 80px;">
+                <img src="{% static 'certificates/img/logo1.png' %}" alt="Export Quality System - Система добровольной сертификации" class="img-fluid me-3" style="max-height: 80px;">
                 <div class="logo-text">
                     <div>Система добровольной сертификации</div>
                     <div class="export-quality">"Export Quality System"</div>
                 </div>
             </div>
             
+            <!-- SEO заголовок -->
+            <h1 class="h3 mb-3">Проверка действительности сертификатов соответствия</h1>
+            <p class="text-muted mb-4">
+                Официальный реестр сертификатов системы добровольной сертификации "Export Quality System". 
+                Проверьте действительность сертификата по его номеру.
+            </p>
+            
             <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h2 class="h5 mb-0">Поиск сертификата</h2>
+                </div>
                 <div class="card-body p-5">
-                    <h4 class="mb-4">Проверка сертификата</h4>
                     <form method="get" action="{% url 'search_results' %}">
                         <div class="mb-4">
                             <label for="search_query" class="form-label">Введите номер сертификата:</label>
-                            <input type="text" class="form-control form-control-lg" id="search_query" name="search_query" required>
+                            <input type="text" 
+                                   class="form-control form-control-lg" 
+                                   id="search_query" 
+                                   name="search_query" 
+                                   placeholder="Например: EQS-001"
+                                   required
+                                   aria-describedby="searchHelp">
+                            <div id="searchHelp" class="form-text">
+                                Введите полный номер сертификата для поиска
+                            </div>
                         </div>
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-danger btn-lg">Найти</button>
+                            <button type="submit" class="btn btn-danger btn-lg">
+                                <i class="fas fa-search"></i> Найти сертификат
+                            </button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Дополнительная SEO информация -->
+    <div class="row mt-5">
+        <div class="col-md-10 offset-md-1">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="h5 mb-4 text-center">О системе сертификации Export Quality System</h3>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="text-center mb-3">
+                                <i class="fas fa-certificate fa-3x text-danger mb-3"></i>
+                                <h4 class="h6">Что такое сертификат соответствия?</h4>
+                                <p class="small text-muted">
+                                    Сертификат соответствия подтверждает, что система менеджмента качества организации 
+                                    соответствует требованиям международных стандартов ISO.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center mb-3">
+                                <i class="fas fa-search fa-3x text-danger mb-3"></i>
+                                <h4 class="h6">Как проверить сертификат?</h4>
+                                <p class="small text-muted">
+                                    Введите номер сертификата в поле поиска выше. 
+                                    Система покажет актуальную информацию о статусе сертификата.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center mb-3">
+                                <i class="fas fa-shield-alt fa-3x text-danger mb-3"></i>
+                                <h4 class="h6">Зачем проверять сертификат?</h4>
+                                <p class="small text-muted">
+                                    Проверка сертификата позволяет убедиться в его действительности, 
+                                    сроке действия и статусе инспекционных контролей.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Информация о стандартах -->
+    <div class="row mt-4">
+        <div class="col-md-10 offset-md-1">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="h6 mb-3">Поддерживаемые стандарты ISO:</h3>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-unstyled small text-muted">
+                                <li><i class="fas fa-check text-success me-2"></i>ISO 9001 - Система менеджмента качества</li>
+                                <li><i class="fas fa-check text-success me-2"></i>ISO 14001 - Система экологического менеджмента</li>
+                                <li><i class="fas fa-check text-success me-2"></i>ISO 45001 - Система менеджмента охраны труда</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-unstyled small text-muted">
+                                <li><i class="fas fa-check text-success me-2"></i>ISO 22000 - Система менеджмента безопасности пищевых продуктов</li>
+                                <li><i class="fas fa-check text-success me-2"></i>ISO 27001 - Система менеджмента информационной безопасности</li>
+                                <li><i class="fas fa-check text-success me-2"></i>И другие международные стандарты</li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

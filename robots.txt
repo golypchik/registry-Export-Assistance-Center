@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://ваш-домен.com/sitemap.xml
+
+# Запрещаем индексацию административных страниц
+Disallow: /admin/
+Disallow: /static/admin/
