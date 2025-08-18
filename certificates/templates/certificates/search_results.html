@@ -39,6 +39,42 @@
         height: 90vh; /* 90% высоты экрана */
         width: 100%;
     }
+    
+    /* Стили для кнопок в модальном окне */
+    .modal-footer .btn {
+        min-width: 120px;
+        padding: 12px 24px;
+        font-weight: 600;
+        border-radius: 25px;
+        border: none;
+        text-decoration: none;
+        display: inline-block;
+        text-align: center;
+        font-size: 14px;
+        transition: all 0.3s ease;
+    }
+    
+    .modal-footer .btn-danger {
+        background: linear-gradient(45deg, #dc3545, #c82333);
+        color: #fff;
+    }
+    
+    .modal-footer .btn-danger:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(220, 53, 69, 0.4);
+        color: #fff;
+    }
+    
+    .modal-footer .btn-secondary {
+        background: linear-gradient(45deg, #6c757d, #5a6268);
+        color: #fff;
+    }
+    
+    .modal-footer .btn-secondary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(108, 117, 125, 0.4);
+        color: #fff;
+    }
 </style>
 <div class="container">
     <div class="row mb-4">
