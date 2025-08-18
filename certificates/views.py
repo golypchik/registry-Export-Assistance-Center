@@ -21,11 +21,25 @@ def protected_media(request, path):
     """
     Защищенное обслуживание медиа файлов
     """
-    try:
-        return serve(request, path, document_root=settings.MEDIA_ROOT)
-    except Exception:
+    import os
+    from django.http import Http404, FileResponse
+    
+    # Проверяем, что путь безопасен (предотвращаем directory traversal атаки)
+    if '..' in path or path.startswith('/'):
+        raise Http404("Недопустимый путь к файлу")
+    
+    # Полный путь к файлу
+    file_path = os.path.join(settings.MEDIA_ROOT, path)
+    
+    # Проверяем, что файл существует и находится в MEDIA_ROOT
+    if not os.path.exists(file_path) or not os.path.commonpath([settings.MEDIA_ROOT, file_path]) == settings.MEDIA_ROOT:
         raise Http404("Файл не найден")
     
+    try:
+        # Используем FileResponse для лучшей производительности
+        return FileResponse(open(file_path, 'rb'))
+    except (IOError, OSError):
+        raise Http404("Ошибка при чтении файла")    
 def delete_certificate(request, certificate_id):
     certificate = get_object_or_404(Certificate, id=certificate_id)
     
