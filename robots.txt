@@ -2,7 +2,7 @@ User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: https://ваш-домен.com/sitemap.xml
+Sitemap: https://registry-export-assistance-center.onrender.com/sitemap.xml
 
 # Запрещаем индексацию административных страниц
 Disallow: /admin/
