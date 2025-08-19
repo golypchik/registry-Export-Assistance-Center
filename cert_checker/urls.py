@@ -16,7 +16,7 @@ from django.http import HttpResponse, FileResponse, Http404
 from django.views.decorators.http import require_GET
 from django.views.generic import TemplateView
 from django.contrib.sitemaps.views import sitemap
-
+from django.views.static import serve
 # Импорт views из приложения certificates
 from certificates import views
 
@@ -59,44 +59,33 @@ def robots_txt(request):
     return HttpResponse("\n".join(lines), content_type="text/plain")
 
 @require_GET
-def verification_file(request, filename):
-    """Обслуживание файлов верификации поисковых систем"""
-    try:
-        # Путь к файлам верификации
-        verification_dir = os.path.join(settings.STATIC_ROOT, 'verification')
-        file_path = os.path.join(verification_dir, filename)
-        
-        # Проверяем существование файла
-        if os.path.exists(file_path) and os.path.isfile(file_path):
-            # Определяем content-type по расширению
-            if filename.endswith('.xml'):
-                content_type = 'application/xml'
-            else:
-                content_type = 'text/html'
-            
-            return FileResponse(open(file_path, 'rb'), content_type=content_type)
-        else:
-            raise Http404("Файл верификации не найден")
-    except Exception as e:
-        raise Http404(f"Ошибка при обслуживании файла верификации: {e}")
+def google_verification(request):
+    """Обслуживание файла верификации Google"""
+    file_path = os.path.join(settings.BASE_DIR, 'googlec0ac4a089806bf02.html')
+    if os.path.exists(file_path):
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return HttpResponse(content, content_type='text/html')
+    raise Http404("Google verification file not found")
+
+@require_GET
+def yandex_verification(request):
+    """Обслуживание файла верификации Яндекс"""
+    file_path = os.path.join(settings.BASE_DIR, 'yandex_77e8b3f69934cd66.html')
+    if os.path.exists(file_path):
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return HttpResponse(content, content_type='text/html')
+    raise Http404("Yandex verification file not found")
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('certificates.urls')),
     path('robots.txt', robots_txt, name='robots_txt'),
     
-    # Файлы верификации поисковых систем (Google)
-    re_path(r'^google(?P<filename>[a-f0-9]+)\.html$', verification_file, name='google_verification'),
-    
-    # Файлы верификации поисковых систем (Яндекс)
-    re_path(r'^yandex_(?P<filename>[a-f0-9]+)\.html$', verification_file, name='yandex_verification'),
-    
-    # Файлы верификации поисковых систем (Bing)
-    re_path(r'^BingSiteAuth\.xml$', verification_file, {'filename': 'BingSiteAuth.xml'}, name='bing_verification'),
-    
-    # Дополнительные файлы верификации (на случай других форматов)
-    re_path(r'^(?P<filename>google[a-f0-9]+\.html)$', verification_file, name='google_verification_alt'),
-    re_path(r'^(?P<filename>yandex_[a-f0-9]+\.html)$', verification_file, name='yandex_verification_alt'),
+    # Файлы верификации поисковых систем
+    path('googlec0ac4a089806bf02.html', google_verification, name='google_verification'),
+    path('yandex_77e8b3f69934cd66.html', yandex_verification, name='yandex_verification'),
 ]
 
 # Добавляем sitemap только если sitemaps определены
