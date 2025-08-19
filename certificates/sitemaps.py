@@ -1,28 +1,46 @@
 from django.contrib.sitemaps import Sitemap
 from django.urls import reverse
+from django.utils import timezone
 from .models import Certificate
 
 class StaticViewSitemap(Sitemap):
     """Sitemap для статических страниц"""
-    priority = 0.5
-    changefreq = 'daily'
+    priority = 0.8
+    changefreq = 'weekly'
+    protocol = 'https'
 
     def items(self):
-        return ['index', 'search']
+        return ['search_certificates']
 
     def location(self, item):
-        return reverse(item)
+        try:
+            return reverse(item)
+        except:
+            return '/'
 
 class CertificateSitemap(Sitemap):
     """Sitemap для сертификатов"""
-    changefreq = "weekly"
-    priority = 0.8
+    changefreq = 'daily'
+    priority = 0.9
+    protocol = 'https'
+    limit = 1000
 
     def items(self):
-        return Certificate.objects.filter(status='active')
+        try:
+            return Certificate.objects.filter(
+                status__in=['active', 'valid', 'issued']
+            ).order_by('-id')[:500]  # Ограничиваем количество
+        except:
+            return []
 
     def lastmod(self, obj):
-        return obj.updated_at if hasattr(obj, 'updated_at') else obj.created_at
+        try:
+            return getattr(obj, 'updated_at', timezone.now())
+        except:
+            return timezone.now()
 
     def location(self, obj):
-        return reverse('certificate_detail', args=[obj.certificate_number])
+        try:
+            return f'/certificate/{obj.pk}/'
+        except:
+            return '/'
