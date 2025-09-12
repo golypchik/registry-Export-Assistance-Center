@@ -1,0 +1,11 @@
+[tool.basedpyright]
+# Добавляем корень репозитория в sys.path для типизатора,
+# чтобы он видел пакет `certificates` (на одном уровне с `cert_checker`).
+extraPaths = ["."]
+typeCheckingMode = "standard"
+ignore = [
+  "**/__pycache__/**",
+  "static_collected/**",
+  "staticfiles/**"
+]
+
