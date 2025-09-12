@@ -11,9 +11,10 @@
     <meta name="keywords" content="{% block keywords %}сертификат соответствия, Export Quality System, проверка сертификата, реестр сертификатов, ISO стандарты, система менеджмента качества, добровольная сертификация{% endblock %}">
     <meta name="author" content="ООО Центр содействия экспорту">
     <meta name="robots" content="index, follow">
+    <meta name="application-name" content="Центр Содействия Экспорту">
     
     <!-- Open Graph для социальных сетей -->
-    <meta property="og:title" content="{% block og_title %}Система добровольной сертификации Export Quality System{% endblock %}">
+    <meta property="og:title" content="{% block og_title %}Центр Содействия Экспорту — Export Quality System{% endblock %}">
     <meta property="og:site_name" content="Центр Содействия Экспорту">
     <meta property="og:description" content="{% block og_description %}Официальный реестр сертификатов системы добровольной сертификации Export Quality System{% endblock %}">
     <meta property="og:type" content="website">
@@ -42,13 +43,22 @@
     {
         "@context": "https://schema.org",
         "@type": "Organization",
-        "name": "ООО Центр содействия экспорту",
-        "description": "Система добровольной сертификации Export Quality System",
+        "name": "Центр Содействия Экспорту",
+        "alternateName": "ООО Центр содействия экспорту",
         "url": "{{ request.build_absolute_uri }}",
-        "logo": "{% static 'certificates/img/logo1.png' %}",
-        "contactPoint": {
-            "@type": "ContactPoint",
-            "contactType": "customer service"
+        "logo": "{% static 'certificates/img/logo1.png' %}"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Центр Содействия Экспорту",
+        "url": "{{ request.build_absolute_uri }}",
+        "potentialAction": {
+            "@type": "SearchAction",
+            "target": "{{ request.scheme }}://{{ request.get_host }}{% url 'search_results' %}?search_query={search_term}",
+            "query-input": "required name=search_term"
         }
     }
     </script>
