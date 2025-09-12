@@ -13,7 +13,7 @@ from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import HttpResponse, FileResponse, Http404
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_safe
 from django.views.generic import TemplateView
 from django.contrib.sitemaps.views import sitemap
 from django.views.static import serve
@@ -31,7 +31,7 @@ except ImportError:
     # Если файл sitemaps.py не существует, используем пустой словарь
     sitemaps = {}
 
-@require_GET
+@require_safe
 def robots_txt(request):
     lines = [
         "User-agent: *",
