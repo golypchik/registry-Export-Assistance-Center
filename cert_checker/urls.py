@@ -88,16 +88,10 @@ urlpatterns = [
     path('yandex_77e8b3f69934cd66.html', yandex_verification, name='yandex_verification'),
 ]
 
-# Добавляем sitemap только если sitemaps определены
-if sitemaps:
-    urlpatterns.append(
-        path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap')
-    )
-else:
-    # Fallback sitemap
-    urlpatterns.append(
-        path('sitemap.xml', TemplateView.as_view(template_name='sitemap.xml', content_type='application/xml'))
-    )
+# Всегда отдаём Django sitemaps, чтобы исключить дублирующий шаблонный sitemap.xml
+urlpatterns.append(
+    path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap')
+)
 
 # Обслуживание файлов
 if settings.DEBUG:
