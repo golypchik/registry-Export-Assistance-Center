@@ -32,8 +32,8 @@ INSTALLED_APPS = [
     'certificates',
 ]
 
-# Добавляем WhiteNoise приложения только для продакшена
-if 'RENDER' in os.environ:
+# Добавляем WhiteNoise приложения для продакшена
+if 'RENDER' in os.environ or 'RAILWAY_ENVIRONMENT' in os.environ or not DEBUG:
     INSTALLED_APPS.insert(-2, 'whitenoise.runserver_nostatic')
 
 MIDDLEWARE = [
@@ -46,8 +46,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# Добавляем WhiteNoise только для продакшена
-if 'RENDER' in os.environ:
+# Добавляем WhiteNoise для продакшена (проверяем разные переменные)
+if 'RENDER' in os.environ or 'RAILWAY_ENVIRONMENT' in os.environ or not DEBUG:
     MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
 ROOT_URLCONF = 'cert_checker.urls'
@@ -119,9 +119,13 @@ STATICFILES_FINDERS = [
 ]
 
 # WhiteNoise configuration for static files
-if 'RENDER' in os.environ:
-    # Для продакшена - используем WhiteNoise без манифеста для избежания ошибок
+if 'RENDER' in os.environ or 'RAILWAY_ENVIRONMENT' in os.environ or not DEBUG:
+    # Для продакшена - используем простое WhiteNoise хранилище
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+    # Дополнительные настройки WhiteNoise для стабильности
+    WHITENOISE_SKIP_COMPRESS_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'gz', 'tgz', 'bz2', 'tbz', 'xz', 'br']
+    WHITENOISE_MAX_AGE = 86400  # 24 часа кеширования
+    WHITENOISE_USE_FINDERS = True  # Позволяет находить статические файлы без collectstatic
 else:
     # Для разработки используем стандартный статический хранилище
     STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
