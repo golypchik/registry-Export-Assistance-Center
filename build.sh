@@ -14,11 +14,6 @@ export DEBUG=False
 export RENDER=1
 python manage.py collectstatic --no-input --clear
 
-# Debug: check if logo files exist after collectstatic
-echo "=== CHECKING LOGO FILES AFTER COLLECTSTATIC ==="
-ls -la staticfiles/certificates/img/logo*.png || echo "ERROR: Logo files not found!"
-echo "=== END LOGO CHECK ==="
-
 # Run migrations
 echo "Running database migrations..."
 python manage.py migrate
