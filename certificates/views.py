@@ -16,10 +16,9 @@ from django.conf import settings
 from django.views.static import serve
 from django.contrib.auth.decorators import login_required
 
-@login_required
 def protected_media(request, path):
     """
-    Защищенное обслуживание медиа файлов
+    Обслуживание медиа файлов с контролем доступа
     """
     import os
     from django.http import Http404, FileResponse
@@ -35,9 +34,24 @@ def protected_media(request, path):
     if not os.path.exists(file_path) or not os.path.commonpath([settings.MEDIA_ROOT, file_path]) == settings.MEDIA_ROOT:
         raise Http404("Файл не найден")
     
+    # Публичные файлы (сертификаты, QR-коды) - доступны всем
+    public_paths = ['certificates/', 'qr_codes/', 'permissions/', 'audit_files/', 'audit_images/']
+    is_public = any(path.startswith(pub_path) for pub_path in public_paths)
+    
+    # Приватные файлы требуют авторизации
+    if not is_public and not request.user.is_authenticated:
+        from django.contrib.auth.views import redirect_to_login
+        return redirect_to_login(request.get_full_path())
+    
     try:
         # Используем FileResponse для лучшей производительности
-        return FileResponse(open(file_path, 'rb'))
+        response = FileResponse(open(file_path, 'rb'))
+        
+        # Добавляем заголовки для кеширования публичных файлов
+        if is_public:
+            response['Cache-Control'] = 'public, max-age=86400'  # 24 часа
+            
+        return response
     except (IOError, OSError):
         raise Http404("Ошибка при чтении файла")    
 def delete_certificate(request, certificate_id):
