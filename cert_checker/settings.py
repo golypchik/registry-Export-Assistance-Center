@@ -112,9 +112,11 @@ STATIC_URL = '/static/'
 if 'RENDER' in os.environ or 'RAILWAY_ENVIRONMENT' in os.environ or not DEBUG:
     # Для продакшена - Render ожидает staticfiles
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+    print(f"🔧 PRODUCTION MODE: STATIC_ROOT = {STATIC_ROOT}")
 else:
     # Для локальной разработки используем static_collected
     STATIC_ROOT = os.path.join(BASE_DIR, 'static_collected')
+    print(f"🔧 DEVELOPMENT MODE: STATIC_ROOT = {STATIC_ROOT}")
 
 # Directories where Django will search for static files
 STATICFILES_DIRS = []
