@@ -107,14 +107,21 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static_collected')
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Directories where Django will search for static files
 STATICFILES_DIRS = []
 
-# WhiteNoise configuration for static files (только для продакшена)
+# Static files finders
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+]
+
+# WhiteNoise configuration for static files
 if 'RENDER' in os.environ:
-    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+    # Для продакшена - используем WhiteNoise без манифеста для избежания ошибок
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 else:
     # Для разработки используем стандартный статический хранилище
     STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'

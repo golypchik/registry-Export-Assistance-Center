@@ -1,0 +1,555 @@
+From c20e888112cf848f9cded2ed8b978efc3f22b273 Mon Sep 17 00:00:00 2001
+From: ImNseven <qazqzz8@mail.ru>
+Date: Mon, 15 Sep 2025 16:24:48 +0300
+Subject: [PATCH] =?UTF-8?q?=D0=94=D0=BE=D0=B1=D0=B0=D0=B2=D0=BB=D0=B5?=
+ =?UTF-8?q?=D0=BD=D0=B0=20=D1=84=D1=83=D0=BD=D0=BA=D1=86=D0=B8=D0=BE=D0=BD?=
+ =?UTF-8?q?=D0=B0=D0=BB=D1=8C=D0=BD=D0=BE=D1=81=D1=82=D1=8C=20=D0=B2=D1=8B?=
+ =?UTF-8?q?=D0=B1=D0=BE=D1=80=D0=B0=20=D0=98=D0=9D=D0=9D=20=D0=B8=D0=BB?=
+ =?UTF-8?q?=D0=B8=20=D0=A3=D0=9D=D0=9F?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Добавлены поля identifier_type и identifier_value в модель Certificate
+- Реализован выбор между ИНН и УНП в админке с радио-кнопками
+- Добавлен JavaScript для динамической смены лейблов
+- Обновлены все шаблоны для отображения правильного типа идентификатора
+- Расширен поиск для работы с новыми полями
+- Обновлена генерация документов с правильными лейблами
+- Исправлены настройки статических файлов для корректной работы админки
+- Созданы миграции с автоматическим переносом существующих данных
+- Сохранена обратная совместимость
+---
+ cert_checker/settings.py                      | 26 +++++----
+ certificates/admin.py                         | 17 ++++--
+ certificates/forms.py                         |  8 ++-
+ .../migrations/0020_add_identifier_fields.py  | 37 +++++++++++++
+ .../migrations/0021_migrate_inn_data.py       | 34 ++++++++++++
+ certificates/models.py                        | 29 +++++++++-
+ .../certificates/certificate/change_form.html | 28 ++++++++++
+ .../admin/manage_inspections.html             |  4 +-
+ .../certificates/certificate_detail.html      |  4 +-
+ .../certificates/certificate_template.html    |  2 +-
+ .../certificates/edit_certificate.html        | 54 +++++++++++++++++--
+ .../certificates/search_results.html          |  4 +-
+ certificates/utils.py                         | 12 +++--
+ certificates/views.py                         |  3 ++
+ 14 files changed, 230 insertions(+), 32 deletions(-)
+ create mode 100644 certificates/migrations/0020_add_identifier_fields.py
+ create mode 100644 certificates/migrations/0021_migrate_inn_data.py
+ create mode 100644 certificates/templates/admin/certificates/certificate/change_form.html
+
+diff --git a/cert_checker/settings.py b/cert_checker/settings.py
+index 013ef9a..aabc14c 100644
+--- a/cert_checker/settings.py
++++ b/cert_checker/settings.py
+@@ -10,7 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
+ SECRET_KEY = config('SECRET_KEY', default='django-insecure-your-secret-key-here-change-in-production')
+ 
+ # SECURITY WARNING: don't run with debug turned on in production!
+-DEBUG = config('DEBUG', default=False, cast=bool)
++DEBUG = config('DEBUG', default=True, cast=bool)
+ 
+ # Разрешенные хосты для Render
+ ALLOWED_HOSTS = ['*']  # Для Render можно использовать *
+@@ -28,14 +28,16 @@ INSTALLED_APPS = [
+     'django.contrib.sessions',
+     'django.contrib.messages',
+     'django.contrib.sitemaps',
+-    'whitenoise.runserver_nostatic',
+     'django.contrib.staticfiles',
+     'certificates',
+ ]
+ 
++# Добавляем WhiteNoise приложения только для продакшена
++if 'RENDER' in os.environ:
++    INSTALLED_APPS.insert(-2, 'whitenoise.runserver_nostatic')
++
+ MIDDLEWARE = [
+     'django.middleware.security.SecurityMiddleware',
+-    'whitenoise.middleware.WhiteNoiseMiddleware',
+     'django.contrib.sessions.middleware.SessionMiddleware',
+     'django.middleware.common.CommonMiddleware',
+     'django.middleware.csrf.CsrfViewMiddleware',
+@@ -44,6 +46,10 @@ MIDDLEWARE = [
+     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+ ]
+ 
++# Добавляем WhiteNoise только для продакшена
++if 'RENDER' in os.environ:
++    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
++
+ ROOT_URLCONF = 'cert_checker.urls'
+ 
+ TEMPLATES = [
+@@ -101,15 +107,17 @@ USE_TZ = True
+ 
+ # Static files (CSS, JavaScript, Images)
+ STATIC_URL = '/static/'
+-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
++STATIC_ROOT = os.path.join(BASE_DIR, 'static_collected')
+ 
+ # Directories where Django will search for static files
+-STATICFILES_DIRS = [
+-    os.path.join(BASE_DIR, 'static_collected'),
+-]
++STATICFILES_DIRS = []
+ 
+-# WhiteNoise configuration for static files
+-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
++# WhiteNoise configuration for static files (только для продакшена)
++if 'RENDER' in os.environ:
++    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
++else:
++    # Для разработки используем стандартный статический хранилище
++    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+ 
+ # Media files configuration for Render
+ MEDIA_URL = '/media/'
+diff --git a/certificates/admin.py b/certificates/admin.py
+index ba9a80e..a04cc62 100644
+--- a/certificates/admin.py
++++ b/certificates/admin.py
+@@ -44,18 +44,27 @@ class CertificateAdminForm(forms.ModelForm):
+     class Meta:
+         model = Certificate
+         fields = '__all__'
++        
++    def __init__(self, *args, **kwargs):
++        super().__init__(*args, **kwargs)
++        self.fields['identifier_type'].widget = forms.RadioSelect(choices=Certificate.IDENTIFIER_TYPE_CHOICES)
++        self.fields['identifier_value'].widget = forms.TextInput(attrs={'size': '20'})
+ 
+ @admin.register(Certificate)
+ class CertificateAdmin(admin.ModelAdmin):
+     form = CertificateAdminForm
+     inlines = [AuditorInline]
+-    list_display = ('name', 'full_certificate_number', 'inn', 'iso_standard', 'iso_standard_name', 'status', 
++    list_display = ('name', 'full_certificate_number', 'display_identifier_info', 'iso_standard', 'iso_standard_name', 'status', 
+                     'first_inspection_status', 'second_inspection_status', 'download_psd_link',
+                     'start_date', 'expiry_date', 'notifications_enabled')
+-    list_filter = ('status', 'iso_standard', 'first_inspection_status', 'second_inspection_status', 'notifications_enabled')
+-    search_fields = ('name', 'certificate_number_part', 'inn')
++    list_filter = ('status', 'iso_standard', 'identifier_type', 'first_inspection_status', 'second_inspection_status', 'notifications_enabled')
++    search_fields = ('name', 'certificate_number_part', 'identifier_value', 'inn')
+     date_hierarchy = 'created_at'
+     
++    def display_identifier_info(self, obj):
++        return f"{obj.display_identifier_label}: {obj.display_identifier}"
++    display_identifier_info.short_description = "Идентификатор"
++    
+     def download_psd_link(self, obj):
+         if obj.file1_psd:
+             return format_html('<a href="{}">Скачать PSD</a>', obj.file1_psd.url)
+@@ -66,7 +75,7 @@ class CertificateAdmin(admin.ModelAdmin):
+     
+     fieldsets = (
+         ('Информация об организации', {
+-            'fields': ('name', 'inn', 'address')
++            'fields': ('name', 'identifier_type', 'identifier_value', 'address')
+         }),
+         ('Информация о сертификате', {
+             'fields': ('certificate_number_part', 'iso_standard', 'iso_standard_name', 'quality_management_system', 
+diff --git a/certificates/forms.py b/certificates/forms.py
+index 309b40f..64126d1 100644
+--- a/certificates/forms.py
++++ b/certificates/forms.py
+@@ -29,13 +29,15 @@ class CertificateForm(forms.ModelForm):
+     
+     class Meta:
+         model = Certificate
+-        fields = ['name', 'inn', 'address', 'certificate_number_part', 'iso_standard',
++        fields = ['name', 'identifier_type', 'identifier_value', 'address', 'certificate_number_part', 'iso_standard',
+                   'iso_standard_name', 'quality_management_system', 'start_date', 'expiry_date',
+                   'status', 'first_inspection_date', 'first_inspection_status',
+                   'second_inspection_date', 'second_inspection_status',
+                   'file1', 'file1_psd', 'file2', 'file2_psd', 'file3', 'client_email', 'notifications_enabled',
+                   'validity_period', 'certification_area', 'qr_code']
+         widgets = {
++            'identifier_type': forms.RadioSelect(),
++            'identifier_value': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите номер'}),
+             'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+             'expiry_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+             'first_inspection_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+@@ -53,6 +55,10 @@ class CertificateForm(forms.ModelForm):
+         
+         if not self.instance.pk:
+             self.fields['certificate_number_part'].initial = self.get_next_number()
++        
++        # Инициализация полей идентификатора
++        self.fields['identifier_type'].label = 'Тип идентификатора'
++        self.fields['identifier_value'].label = 'Номер идентификатора'
+ 
+     def clean_certificate_number_part(self):
+         part = self.cleaned_data['certificate_number_part']
+diff --git a/certificates/migrations/0020_add_identifier_fields.py b/certificates/migrations/0020_add_identifier_fields.py
+new file mode 100644
+index 0000000..9bca454
+--- /dev/null
++++ b/certificates/migrations/0020_add_identifier_fields.py
+@@ -0,0 +1,37 @@
++# Generated by Django 5.2.3 on 2025-09-15 12:51
++
++from django.db import migrations, models
++
++
++class Migration(migrations.Migration):
++
++    dependencies = [
++        ("certificates", "0019_remove_certificate_generated_permission"),
++    ]
++
++    operations = [
++        migrations.AddField(
++            model_name="certificate",
++            name="identifier_type",
++            field=models.CharField(
++                choices=[("inn", "ИНН"), ("unp", "УНП")],
++                default="inn",
++                max_length=3,
++                verbose_name="Тип идентификатора",
++            ),
++        ),
++        migrations.AddField(
++            model_name="certificate",
++            name="identifier_value",
++            field=models.CharField(
++                default="", max_length=255, verbose_name="Номер идентификатора"
++            ),
++        ),
++        migrations.AlterField(
++            model_name="certificate",
++            name="inn",
++            field=models.CharField(
++                blank=True, max_length=255, null=True, verbose_name="ИНН организации"
++            ),
++        ),
++    ]
+diff --git a/certificates/migrations/0021_migrate_inn_data.py b/certificates/migrations/0021_migrate_inn_data.py
+new file mode 100644
+index 0000000..294f62d
+--- /dev/null
++++ b/certificates/migrations/0021_migrate_inn_data.py
+@@ -0,0 +1,34 @@
++# Generated by Django 5.2.3 on 2025-09-15 12:51
++
++from django.db import migrations
++
++
++def migrate_inn_to_identifier(apps, schema_editor):
++    Certificate = apps.get_model('certificates', 'Certificate')
++    for certificate in Certificate.objects.all():
++        if certificate.inn and not certificate.identifier_value:
++            certificate.identifier_value = certificate.inn
++            certificate.identifier_type = 'inn'
++            certificate.save()
++
++
++def reverse_migrate_inn_to_identifier(apps, schema_editor):
++    Certificate = apps.get_model('certificates', 'Certificate')
++    for certificate in Certificate.objects.all():
++        if certificate.identifier_value and certificate.identifier_type == 'inn':
++            certificate.inn = certificate.identifier_value
++            certificate.save()
++
++
++class Migration(migrations.Migration):
++
++    dependencies = [
++        ("certificates", "0020_add_identifier_fields"),
++    ]
++
++    operations = [
++        migrations.RunPython(
++            migrate_inn_to_identifier,
++            reverse_migrate_inn_to_identifier
++        ),
++    ]
+diff --git a/certificates/models.py b/certificates/models.py
+index 2c8e2a6..3cec035 100644
+--- a/certificates/models.py
++++ b/certificates/models.py
+@@ -42,8 +42,15 @@ class Certificate(models.Model):
+         ('failed', 'Не пройден'),
+     ]
+     
++    IDENTIFIER_TYPE_CHOICES = [
++        ('inn', 'ИНН'),
++        ('unp', 'УНП'),
++    ]
++    
+     name = models.CharField('Наименование организации', max_length=255)
+-    inn = models.CharField('ИНН организации', max_length=255)
++    identifier_type = models.CharField('Тип идентификатора', max_length=3, choices=IDENTIFIER_TYPE_CHOICES, default='inn')
++    identifier_value = models.CharField('Номер идентификатора', max_length=255, default='')
++    inn = models.CharField('ИНН организации', max_length=255, blank=True, null=True)  # Оставляем для совместимости, будет удалено после миграции
+     address = models.TextField('Адрес организации')
+     
+     certificate_number_part = models.CharField(max_length=5, unique=True, verbose_name="Номер сертификата (часть)")
+@@ -94,6 +101,21 @@ class Certificate(models.Model):
+     def full_certificate_number(self):
+         iso_code = self.iso_standard.certificate_number_prefix
+         return f"№SMK.{self.certificate_number_part}{iso_code}"
++    
++    @property
++    def display_identifier(self):
++        """Возвращает значение идентификатора"""
++        return self.identifier_value or self.inn or ''
++    
++    @property
++    def display_identifier_label(self):
++        """Возвращает подпись для идентификатора (ИНН или УНП)"""
++        return dict(self.IDENTIFIER_TYPE_CHOICES).get(self.identifier_type, 'ИНН')
++    
++    @property 
++    def inn_display(self):
++        """Для обратной совместимости - возвращает значение идентификатора"""
++        return self.display_identifier
+ 
+     def clean(self):
+         super().clean()
+@@ -262,6 +284,11 @@ class Certificate(models.Model):
+     def save(self, *args, **kwargs):
+         is_new = self.pk is None
+         
++        # Миграция данных из старого поля inn в новые поля
++        if self.inn and not self.identifier_value:
++            self.identifier_value = self.inn
++            self.identifier_type = 'inn'
++        
+         # Устанавливаем название стандарта
+         if not self.iso_standard_name and self.iso_standard:
+             self.iso_standard_name = self.iso_standard.certificate_standard_name
+diff --git a/certificates/templates/admin/certificates/certificate/change_form.html b/certificates/templates/admin/certificates/certificate/change_form.html
+new file mode 100644
+index 0000000..aaa25c2
+--- /dev/null
++++ b/certificates/templates/admin/certificates/certificate/change_form.html
+@@ -0,0 +1,28 @@
++{% extends "admin/change_form.html" %}
++
++{% block admin_change_form_document_ready %}
++{{ block.super }}
++<script>
++(function($) {
++    function updateIdentifierLabel() {
++        var identifierType = $('input[name="identifier_type"]:checked').val();
++        var label = identifierType === 'unp' ? 'Номер УНП:' : 'Номер ИНН:';
++        var placeholder = identifierType === 'unp' ? 'Введите номер УНП' : 'Введите номер ИНН';
++        
++        // Обновляем label
++        $('label[for="id_identifier_value"]').text(label);
++        
++        // Обновляем placeholder
++        $('#id_identifier_value').attr('placeholder', placeholder);
++    }
++    
++    // Инициализация при загрузке
++    updateIdentifierLabel();
++    
++    // Обновление при изменении типа
++    $('input[name="identifier_type"]').change(function() {
++        updateIdentifierLabel();
++    });
++})(django.jQuery);
++</script>
++{% endblock %}
+diff --git a/certificates/templates/certificates/admin/manage_inspections.html b/certificates/templates/certificates/admin/manage_inspections.html
+index f72274e..5375602 100644
+--- a/certificates/templates/certificates/admin/manage_inspections.html
++++ b/certificates/templates/certificates/admin/manage_inspections.html
+@@ -22,8 +22,8 @@
+                 <div class="col-md-8">{{ certificate.name }}</div>
+             </div>
+             <div class="row mb-3">
+-                <div class="col-md-4 fw-bold">ИНН:</div>
+-                <div class="col-md-8">{{ certificate.inn }}</div>
++                <div class="col-md-4 fw-bold">{{ certificate.display_identifier_label }}:</div>
++                <div class="col-md-8">{{ certificate.display_identifier }}</div>
+             </div>
+             <div class="row mb-3">
+                 <div class="col-md-4 fw-bold">Стандарт:</div>
+diff --git a/certificates/templates/certificates/certificate_detail.html b/certificates/templates/certificates/certificate_detail.html
+index fac85fe..14e7ca5 100644
+--- a/certificates/templates/certificates/certificate_detail.html
++++ b/certificates/templates/certificates/certificate_detail.html
+@@ -30,8 +30,8 @@
+                             <div class="col-md-8">{{ certificate.name }}</div>
+                         </div>
+                         <div class="row mb-3">
+-                            <div class="col-md-4 fw-bold">ИНН организации:</div>
+-                            <div class="col-md-8">{{ certificate.inn }}</div>
++                            <div class="col-md-4 fw-bold">{{ certificate.display_identifier_label }} организации:</div>
++                            <div class="col-md-8">{{ certificate.display_identifier }}</div>
+                         </div>
+                         <div class="row mb-3">
+                             <div class="col-md-4 fw-bold">Адрес:</div>
+diff --git a/certificates/templates/certificates/certificate_template.html b/certificates/templates/certificates/certificate_template.html
+index 5ad563c..57f5f56 100644
+--- a/certificates/templates/certificates/certificate_template.html
++++ b/certificates/templates/certificates/certificate_template.html
+@@ -33,7 +33,7 @@
+             var certificateData = {
+                 '%%CERTIFICATE_NUMBER%%': '{{ certificate.full_certificate_number|escapejs }}',
+                 '%%ORGANIZATION_NAME%%': '{{ certificate.name|escapejs }}',
+-                '%%INN%%': '{{ certificate.inn|escapejs }}',
++                '%%INN%%': '{{ certificate.display_identifier|escapejs }}',
+                 '%%ADDRESS%%': '{{ certificate.address|escapejs }}',
+                 '%%QUALITY_MANAGEMENT_SYSTEM%%': '{{ certificate.quality_management_system|escapejs }}',
+                 '%%ISO_STANDARD%%': '{{ certificate.iso_standard.certificate_standard_name|escapejs }}',
+diff --git a/certificates/templates/certificates/edit_certificate.html b/certificates/templates/certificates/edit_certificate.html
+index 49e2486..4f675b4 100644
+--- a/certificates/templates/certificates/edit_certificate.html
++++ b/certificates/templates/certificates/edit_certificate.html
+@@ -49,12 +49,31 @@
+             </div>
+             
+             <div class="mb-3">
+-                <label for="{{ form.inn.id_for_label }}" class="form-label">{{ form.inn.label }}</label>
+-                {{ form.inn }}
+-                {% if form.inn.errors %}
+-                <div class="text-danger">
+-                    {{ form.inn.errors }}
++                <label class="form-label">{{ form.identifier_type.label }}</label>
++                <div class="d-flex gap-3 mb-2">
++                    {% for choice in form.identifier_type %}
++                        <div class="form-check">
++                            {{ choice.tag }}
++                            <label class="form-check-label" for="{{ choice.id_for_label }}">
++                                {{ choice.choice_label }}
++                            </label>
++                        </div>
++                    {% endfor %}
+                 </div>
++                {% if form.identifier_type.errors %}
++                    <div class="text-danger">
++                        {{ form.identifier_type.errors }}
++                    </div>
++                {% endif %}
++            </div>
++            
++            <div class="mb-3">
++                <label for="{{ form.identifier_value.id_for_label }}" class="form-label" id="identifier-label">{{ form.identifier_value.label }}</label>
++                {{ form.identifier_value }}
++                {% if form.identifier_value.errors %}
++                    <div class="text-danger">
++                        {{ form.identifier_value.errors }}
++                    </div>
+                 {% endif %}
+             </div>
+             
+@@ -469,6 +488,31 @@ document.addEventListener('DOMContentLoaded', function() {
+         formsContainer.appendChild(newForm);
+         totalForms.value = formCount + 1;
+     });
++
++    // JavaScript для переключения между ИНН и УНП
++    function updateIdentifierLabel() {
++        const identifierType = document.querySelector('input[name="identifier_type"]:checked');
++        const label = document.getElementById('identifier-label');
++        const input = document.querySelector('input[name="identifier_value"]');
++        
++        if (identifierType && label && input) {
++            if (identifierType.value === 'unp') {
++                label.textContent = 'Номер УНП:';
++                input.placeholder = 'Введите номер УНП';
++            } else {
++                label.textContent = 'Номер ИНН:';
++                input.placeholder = 'Введите номер ИНН';
++            }
++        }
++    }
++    
++    // Инициализация при загрузке
++    updateIdentifierLabel();
++    
++    // Обновление при изменении типа
++    document.querySelectorAll('input[name="identifier_type"]').forEach(function(radio) {
++        radio.addEventListener('change', updateIdentifierLabel);
++    });
+ });
+ </script>
+ 
+diff --git a/certificates/templates/certificates/search_results.html b/certificates/templates/certificates/search_results.html
+index f4b5b33..f4d2f1b 100644
+--- a/certificates/templates/certificates/search_results.html
++++ b/certificates/templates/certificates/search_results.html
+@@ -104,8 +104,8 @@
+                                     <div class="col-md-8">{{ certificate.name }}</div>
+                                 </div>
+                                 <div class="row mb-3">
+-                                    <div class="col-md-4 fw-bold">ИНН организации:</div>
+-                                    <div class="col-md-8">{{ certificate.inn }}</div>
++                                    <div class="col-md-4 fw-bold">{{ certificate.display_identifier_label }} организации:</div>
++                                    <div class="col-md-8">{{ certificate.display_identifier }}</div>
+                                 </div>
+                                 <div class="row mb-3">
+                                     <div class="col-md-4 fw-bold">Номер сертификата:</div>
+diff --git a/certificates/utils.py b/certificates/utils.py
+index c6c60c6..2bafe86 100644
+--- a/certificates/utils.py
++++ b/certificates/utils.py
+@@ -106,7 +106,8 @@ def generate_certificate_image(certificate, file1_cleared=False, file1_psd_clear
+             replace_dict = {
+                 '%%CERTIFICATE_NUMBER%%': certificate.full_certificate_number,
+                 '%%ORGANIZATION_NAME%%': certificate.name,
+-                '%%INN%%': certificate.inn,
++                '%%INN%%': certificate.display_identifier,
++                '%%INN_LABEL%%': certificate.display_identifier_label,
+                 '%%ADDRESS%%': certificate.address,
+                 '%%QUALITY_MANAGEMENT_SYSTEM%%': certificate.quality_management_system,
+                 '%%ISO_STANDARD%%': certificate.iso_standard_name or str(certificate.iso_standard),
+@@ -191,7 +192,8 @@ def generate_permission_image(certificate, file2_cleared=False, file2_psd_cleare
+             replace_dict = {
+                 '%%CERTIFICATE_NUMBER%%': certificate.full_certificate_number,
+                 '%%ORGANIZATION_NAME%%': certificate.name,
+-                '%%INN%%': certificate.inn,
++                '%%INN%%': certificate.display_identifier,
++                '%%INN_LABEL%%': certificate.display_identifier_label,
+                 '%%ADDRESS%%': certificate.address,
+             }
+             
+@@ -339,7 +341,7 @@ def send_single_notification(cert, recipient_type, notification_type, admin_emai
+         'expiry_date': cert.expiry_date.strftime('%d.%m.%Y'),
+         'full_certificate_number': cert.full_certificate_number,
+         'start_date': cert.start_date.strftime('%d.%m.%Y'),
+-        'inn': cert.inn,
++        'inn': cert.display_identifier,
+         'first_inspection_date': cert.first_inspection_date.strftime('%d.%m.%Y') if cert.first_inspection_date else 'Не назначена',
+         'second_inspection_date': cert.second_inspection_date.strftime('%d.%m.%Y') if cert.second_inspection_date else 'Не назначена',
+     }
+@@ -366,7 +368,7 @@ def send_single_notification(cert, recipient_type, notification_type, admin_emai
+ Уведомление о сертификате {cert.full_certificate_number}
+ 
+ Организация: {cert.name}
+-ИНН: {cert.inn}
++{cert.display_identifier_label}: {cert.display_identifier}
+ Стандарт: {cert.iso_standard}
+ Срок действия: с {cert.start_date.strftime('%d.%m.%Y')} по {cert.expiry_date.strftime('%d.%m.%Y')}
+ Тип уведомления: {notification_type}
+@@ -402,7 +404,7 @@ def send_single_notification(cert, recipient_type, notification_type, admin_emai
+ Уведомляем Вас о статусе сертификата {cert.full_certificate_number}
+ 
+ Организация: {cert.name}
+-ИНН: {cert.inn}
++{cert.display_identifier_label}: {cert.display_identifier}
+ Стандарт: {cert.iso_standard}
+ Срок действия: с {cert.start_date.strftime('%d.%m.%Y')} по {cert.expiry_date.strftime('%d.%m.%Y')}
+ 
+diff --git a/certificates/views.py b/certificates/views.py
+index 8e85e5a..6fa247d 100644
+--- a/certificates/views.py
++++ b/certificates/views.py
+@@ -114,6 +114,9 @@ def search_results(request):
+             query |= Q(certificate_number_part__iexact=parts[1])
+         else:
+             query |= Q(certificate_number_part__icontains=search_query)
++            query |= Q(name__icontains=search_query)
++            query |= Q(identifier_value__icontains=search_query)
++            query |= Q(inn__icontains=search_query)  # Для обратной совместимости
+         
+         certificates = Certificate.objects.filter(query)
+         
+-- 
+2.50.1.windows.1
+
