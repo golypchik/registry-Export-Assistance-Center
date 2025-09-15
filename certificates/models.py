@@ -9,6 +9,7 @@ from django.utils.functional import cached_property
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from dateutil.relativedelta import relativedelta
+from .utils import compress_image
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +195,43 @@ class Certificate(models.Model):
             self.file3 = None
             self.clear_file3 = False
     
-    
+    def _compress_images(self):
+        """Сжимает изображения больше 1 МБ до приемлемого размера"""
+        # Список полей с изображениями для сжатия
+        image_fields = ['file1', 'file1_psd', 'file2', 'file2_psd', 'file3', 'qr_code']
+        
+        for field_name in image_fields:
+            field = getattr(self, field_name, None)
+            if field and hasattr(field, 'file') and field.file:
+                try:
+                    # Проверяем, является ли файл изображением по расширению
+                    if field.name:
+                        file_extension = field.name.lower().split('.')[-1]
+                        image_extensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'webp']
+                        
+                        if file_extension in image_extensions:
+                            logger.info(f"Checking image {field.name} for compression...")
+                            
+                            # Сжимаем изображение
+                            compressed_file = compress_image(field, max_size_mb=1)
+                            
+                            if compressed_file:
+                                # Удаляем старый файл
+                                if field.name:
+                                    field.delete(save=False)
+                                
+                                # Сохраняем сжатое изображение
+                                field.save(compressed_file.name, compressed_file, save=False)
+                                logger.info(f"Successfully compressed and replaced {field_name}")
+                            else:
+                                logger.info(f"Image {field.name} is already within size limit")
+                        else:
+                            logger.info(f"Skipping non-image file: {field.name}")
+                            
+                except Exception as e:
+                    logger.error(f"Error compressing image {field_name}: {str(e)}")
+                    # Продолжаем работу даже если одно изображение не удалось сжать
+                    continue
     
     def _generate_qr_code(self):
         """Генерирует QR-код с логотипом и прозрачным фоном"""
@@ -304,6 +341,9 @@ class Certificate(models.Model):
         # Обрабатываем очистку файлов
         self._handle_file_clearing()
         
+        # Сжимаем изображения перед сохранением
+        self._compress_images()
+        
         # Сохраняем объект
         super().save(*args, **kwargs)
         
@@ -374,9 +414,51 @@ class Auditor(models.Model):
             except (ValueError, OSError) as e:
                 logger.warning(f"Не удалось удалить файл {file_field}: {e}")
 
+    def _compress_images(self):
+        """Сжимает изображения больше 1 МБ до приемлемого размера"""
+        # Список полей с изображениями для сжатия
+        image_fields = ['audit_file', 'audit_file_psd', 'generated_audit_image']
+        
+        for field_name in image_fields:
+            field = getattr(self, field_name, None)
+            if field and hasattr(field, 'file') and field.file:
+                try:
+                    # Проверяем, является ли файл изображением по расширению
+                    if field.name:
+                        file_extension = field.name.lower().split('.')[-1]
+                        image_extensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'webp']
+                        
+                        if file_extension in image_extensions:
+                            logger.info(f"Checking auditor image {field.name} for compression...")
+                            
+                            # Сжимаем изображение
+                            compressed_file = compress_image(field, max_size_mb=1)
+                            
+                            if compressed_file:
+                                # Удаляем старый файл
+                                if field.name:
+                                    field.delete(save=False)
+                                
+                                # Сохраняем сжатое изображение
+                                field.save(compressed_file.name, compressed_file, save=False)
+                                logger.info(f"Successfully compressed and replaced auditor {field_name}")
+                            else:
+                                logger.info(f"Auditor image {field.name} is already within size limit")
+                        else:
+                            logger.info(f"Skipping non-image auditor file: {field.name}")
+                            
+                except Exception as e:
+                    logger.error(f"Error compressing auditor image {field_name}: {str(e)}")
+                    # Продолжаем работу даже если одно изображение не удалось сжать
+                    continue
+
     def save(self, *args, **kwargs):
         if not self.audit_number:
             self.audit_number = self.certificate.generate_audit_number()
+        
+        # Сжимаем изображения перед сохранением
+        self._compress_images()
+        
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):

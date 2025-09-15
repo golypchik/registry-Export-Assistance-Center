@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, FileResponse
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
+from datetime import timedelta
 from django.db.models import Q
 from django.urls import reverse
 from django.contrib import messages
@@ -44,13 +45,25 @@ def protected_media(request, path):
         return redirect_to_login(request.get_full_path())
     
     try:
+        # Получаем информацию о файле для оптимизации
+        import mimetypes
+        file_size = os.path.getsize(file_path)
+        content_type = mimetypes.guess_type(file_path)[0] or 'application/octet-stream'
+        
         # Используем FileResponse для лучшей производительности
-        response = FileResponse(open(file_path, 'rb'))
+        response = FileResponse(open(file_path, 'rb'), content_type=content_type)
         
         # Добавляем заголовки для кеширования публичных файлов
         if is_public:
-            response['Cache-Control'] = 'public, max-age=86400'  # 24 часа
+            response['Cache-Control'] = 'public, max-age=2592000, immutable'  # 30 дней + immutable
+            response['ETag'] = f'"{hash(path + str(os.path.getmtime(file_path)))}"'
+            response['Expires'] = (timezone.now() + timedelta(days=30)).strftime('%a, %d %b %Y %H:%M:%S GMT')
+        else:
+            response['Cache-Control'] = 'private, max-age=3600'  # 1 час для приватных
             
+        # Добавляем размер файла для лучшей производительности
+        response['Content-Length'] = str(file_size)
+        
         return response
     except (IOError, OSError):
         raise Http404("Ошибка при чтении файла")    

@@ -2,7 +2,6 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils import timezone
 from datetime import timedelta
-from .models import Certificate
 import logging
 import traceback
 from django.conf import settings
@@ -428,6 +427,7 @@ def send_single_notification(cert, recipient_type, notification_type, admin_emai
 
 def send_mass_notifications(admin_email, today):
     """Отправляет массовые уведомления"""
+    from .models import Certificate  # Отложенный импорт для избежания циркулярного импорта
     certificates = Certificate.objects.filter(notifications_enabled=True)
     logger.info(f"Found {certificates.count()} certificates with notifications enabled")
     notifications_sent = 0
@@ -476,3 +476,119 @@ def send_mass_notifications(admin_email, today):
 
     logger.info(f"Total notifications sent: {notifications_sent}")
     return notifications_sent
+
+
+def compress_image(image_file, max_size_mb=1, quality=85):
+    """
+    Сжимает изображение до указанного размера в МБ, сохраняя приемлемое качество
+    
+    Args:
+        image_file: Django UploadedFile object или file path
+        max_size_mb: максимальный размер в мегабайтах (по умолчанию 1 МБ)
+        quality: качество JPEG (10-95, по умолчанию 85)
+    
+    Returns:
+        ContentFile object или None если сжатие не требуется
+    """
+    try:
+        # Проверяем размер файла
+        max_size_bytes = max_size_mb * 1024 * 1024
+        
+        if hasattr(image_file, 'size'):
+            current_size = image_file.size
+        else:
+            current_size = os.path.getsize(image_file)
+        
+        # Если файл меньше лимита, возвращаем None
+        if current_size <= max_size_bytes:
+            logger.info(f"File size {current_size/1024/1024:.2f}MB is within limit {max_size_mb}MB")
+            return None
+        
+        logger.info(f"Compressing image: {current_size/1024/1024:.2f}MB -> target: {max_size_mb}MB")
+        
+        # Открываем изображение
+        if hasattr(image_file, 'read'):
+            image_file.seek(0)
+            image = Image.open(image_file)
+        else:
+            image = Image.open(image_file)
+        
+        # Конвертируем в RGB если нужно (для JPEG)
+        if image.mode not in ('RGB', 'RGBA'):
+            if image.mode == 'P' and 'transparency' in image.info:
+                image = image.convert('RGBA')
+            else:
+                image = image.convert('RGB')
+        
+        # Начальные параметры
+        current_quality = quality
+        scale_factor = 1.0
+        compressed_data = None
+        
+        # Итеративное сжатие
+        for attempt in range(10):  # максимум 10 попыток
+            # Масштабируем изображение если нужно
+            if scale_factor < 1.0:
+                new_width = int(image.width * scale_factor)
+                new_height = int(image.height * scale_factor)
+                scaled_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            else:
+                scaled_image = image
+            
+            # Сжимаем с текущим качеством
+            buffer = BytesIO()
+            
+            # Определяем формат сохранения
+            format_name = 'JPEG'
+            save_kwargs = {'format': format_name, 'quality': current_quality, 'optimize': True}
+            
+            # Для изображений с прозрачностью используем PNG
+            if scaled_image.mode == 'RGBA':
+                format_name = 'PNG'
+                save_kwargs = {'format': format_name, 'optimize': True}
+            
+            scaled_image.save(buffer, **save_kwargs)
+            compressed_size = buffer.tell()
+            
+            logger.info(f"Attempt {attempt+1}: Quality {current_quality}, Scale {scale_factor:.2f}, Size: {compressed_size/1024/1024:.2f}MB")
+            
+            # Если размер подходит, сохраняем результат
+            if compressed_size <= max_size_bytes:
+                compressed_data = buffer.getvalue()
+                break
+            
+            # Уменьшаем качество или размер для следующей попытки
+            if current_quality > 20:
+                current_quality = max(20, current_quality - 10)
+            else:
+                scale_factor = max(0.5, scale_factor - 0.1)
+        
+        if compressed_data:
+            # Определяем расширение файла
+            extension = '.jpg' if format_name == 'JPEG' else '.png'
+            
+            # Создаем ContentFile
+            compressed_file = ContentFile(compressed_data)
+            
+            # Оригинальное имя файла
+            original_name = getattr(image_file, 'name', 'compressed_image')
+            if hasattr(image_file, 'name') and image_file.name:
+                name_parts = os.path.splitext(image_file.name)
+                compressed_name = f"{name_parts[0]}_compressed{extension}"
+            else:
+                compressed_name = f"compressed_image{extension}"
+            
+            compressed_file.name = compressed_name
+            
+            final_size = len(compressed_data)
+            logger.info(f"Successfully compressed: {current_size/1024/1024:.2f}MB -> {final_size/1024/1024:.2f}MB (reduction: {((current_size-final_size)/current_size*100):.1f}%)")
+            
+            return compressed_file
+        else:
+            logger.warning("Failed to compress image within size limit")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error compressing image: {str(e)}")
+        logger.error(traceback.format_exc())
+        return None
