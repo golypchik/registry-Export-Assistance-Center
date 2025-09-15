@@ -106,7 +106,8 @@ def generate_certificate_image(certificate, file1_cleared=False, file1_psd_clear
             replace_dict = {
                 '%%CERTIFICATE_NUMBER%%': certificate.full_certificate_number,
                 '%%ORGANIZATION_NAME%%': certificate.name,
-                '%%INN%%': certificate.inn,
+                '%%INN%%': certificate.display_identifier,
+                '%%INN_LABEL%%': certificate.display_identifier_label,
                 '%%ADDRESS%%': certificate.address,
                 '%%QUALITY_MANAGEMENT_SYSTEM%%': certificate.quality_management_system,
                 '%%ISO_STANDARD%%': certificate.iso_standard_name or str(certificate.iso_standard),
@@ -191,7 +192,8 @@ def generate_permission_image(certificate, file2_cleared=False, file2_psd_cleare
             replace_dict = {
                 '%%CERTIFICATE_NUMBER%%': certificate.full_certificate_number,
                 '%%ORGANIZATION_NAME%%': certificate.name,
-                '%%INN%%': certificate.inn,
+                '%%INN%%': certificate.display_identifier,
+                '%%INN_LABEL%%': certificate.display_identifier_label,
                 '%%ADDRESS%%': certificate.address,
             }
             
@@ -339,7 +341,7 @@ def send_single_notification(cert, recipient_type, notification_type, admin_emai
         'expiry_date': cert.expiry_date.strftime('%d.%m.%Y'),
         'full_certificate_number': cert.full_certificate_number,
         'start_date': cert.start_date.strftime('%d.%m.%Y'),
-        'inn': cert.inn,
+        'inn': cert.display_identifier,
         'first_inspection_date': cert.first_inspection_date.strftime('%d.%m.%Y') if cert.first_inspection_date else 'Не назначена',
         'second_inspection_date': cert.second_inspection_date.strftime('%d.%m.%Y') if cert.second_inspection_date else 'Не назначена',
     }
@@ -366,7 +368,7 @@ def send_single_notification(cert, recipient_type, notification_type, admin_emai
 Уведомление о сертификате {cert.full_certificate_number}
 
 Организация: {cert.name}
-ИНН: {cert.inn}
+{cert.display_identifier_label}: {cert.display_identifier}
 Стандарт: {cert.iso_standard}
 Срок действия: с {cert.start_date.strftime('%d.%m.%Y')} по {cert.expiry_date.strftime('%d.%m.%Y')}
 Тип уведомления: {notification_type}
@@ -402,7 +404,7 @@ def send_single_notification(cert, recipient_type, notification_type, admin_emai
 Уведомляем Вас о статусе сертификата {cert.full_certificate_number}
 
 Организация: {cert.name}
-ИНН: {cert.inn}
+{cert.display_identifier_label}: {cert.display_identifier}
 Стандарт: {cert.iso_standard}
 Срок действия: с {cert.start_date.strftime('%d.%m.%Y')} по {cert.expiry_date.strftime('%d.%m.%Y')}
 

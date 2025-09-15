@@ -44,17 +44,26 @@ class CertificateAdminForm(forms.ModelForm):
     class Meta:
         model = Certificate
         fields = '__all__'
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['identifier_type'].widget = forms.RadioSelect(choices=Certificate.IDENTIFIER_TYPE_CHOICES)
+        self.fields['identifier_value'].widget = forms.TextInput(attrs={'size': '20'})
 
 @admin.register(Certificate)
 class CertificateAdmin(admin.ModelAdmin):
     form = CertificateAdminForm
     inlines = [AuditorInline]
-    list_display = ('name', 'full_certificate_number', 'inn', 'iso_standard', 'iso_standard_name', 'status', 
+    list_display = ('name', 'full_certificate_number', 'display_identifier_info', 'iso_standard', 'iso_standard_name', 'status', 
                     'first_inspection_status', 'second_inspection_status', 'download_psd_link',
                     'start_date', 'expiry_date', 'notifications_enabled')
-    list_filter = ('status', 'iso_standard', 'first_inspection_status', 'second_inspection_status', 'notifications_enabled')
-    search_fields = ('name', 'certificate_number_part', 'inn')
+    list_filter = ('status', 'iso_standard', 'identifier_type', 'first_inspection_status', 'second_inspection_status', 'notifications_enabled')
+    search_fields = ('name', 'certificate_number_part', 'identifier_value', 'inn')
     date_hierarchy = 'created_at'
+    
+    def display_identifier_info(self, obj):
+        return f"{obj.display_identifier_label}: {obj.display_identifier}"
+    display_identifier_info.short_description = "Идентификатор"
     
     def download_psd_link(self, obj):
         if obj.file1_psd:
@@ -66,7 +75,7 @@ class CertificateAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Информация об организации', {
-            'fields': ('name', 'inn', 'address')
+            'fields': ('name', 'identifier_type', 'identifier_value', 'address')
         }),
         ('Информация о сертификате', {
             'fields': ('certificate_number_part', 'iso_standard', 'iso_standard_name', 'quality_management_system', 

@@ -33,7 +33,7 @@
             var certificateData = {
                 '%%CERTIFICATE_NUMBER%%': '{{ certificate.full_certificate_number|escapejs }}',
                 '%%ORGANIZATION_NAME%%': '{{ certificate.name|escapejs }}',
-                '%%INN%%': '{{ certificate.inn|escapejs }}',
+                '%%INN%%': '{{ certificate.display_identifier|escapejs }}',
                 '%%ADDRESS%%': '{{ certificate.address|escapejs }}',
                 '%%QUALITY_MANAGEMENT_SYSTEM%%': '{{ certificate.quality_management_system|escapejs }}',
                 '%%ISO_STANDARD%%': '{{ certificate.iso_standard.certificate_standard_name|escapejs }}',

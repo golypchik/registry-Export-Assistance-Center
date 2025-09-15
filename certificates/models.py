@@ -42,8 +42,15 @@ class Certificate(models.Model):
         ('failed', 'Не пройден'),
     ]
     
+    IDENTIFIER_TYPE_CHOICES = [
+        ('inn', 'ИНН'),
+        ('unp', 'УНП'),
+    ]
+    
     name = models.CharField('Наименование организации', max_length=255)
-    inn = models.CharField('ИНН организации', max_length=255)
+    identifier_type = models.CharField('Тип идентификатора', max_length=3, choices=IDENTIFIER_TYPE_CHOICES, default='inn')
+    identifier_value = models.CharField('Номер идентификатора', max_length=255, default='')
+    inn = models.CharField('ИНН организации', max_length=255, blank=True, null=True)  # Оставляем для совместимости, будет удалено после миграции
     address = models.TextField('Адрес организации')
     
     certificate_number_part = models.CharField(max_length=5, unique=True, verbose_name="Номер сертификата (часть)")
@@ -94,6 +101,21 @@ class Certificate(models.Model):
     def full_certificate_number(self):
         iso_code = self.iso_standard.certificate_number_prefix
         return f"№SMK.{self.certificate_number_part}{iso_code}"
+    
+    @property
+    def display_identifier(self):
+        """Возвращает значение идентификатора"""
+        return self.identifier_value or self.inn or ''
+    
+    @property
+    def display_identifier_label(self):
+        """Возвращает подпись для идентификатора (ИНН или УНП)"""
+        return dict(self.IDENTIFIER_TYPE_CHOICES).get(self.identifier_type, 'ИНН')
+    
+    @property 
+    def inn_display(self):
+        """Для обратной совместимости - возвращает значение идентификатора"""
+        return self.display_identifier
 
     def clean(self):
         super().clean()
@@ -261,6 +283,11 @@ class Certificate(models.Model):
     
     def save(self, *args, **kwargs):
         is_new = self.pk is None
+        
+        # Миграция данных из старого поля inn в новые поля
+        if self.inn and not self.identifier_value:
+            self.identifier_value = self.inn
+            self.identifier_type = 'inn'
         
         # Устанавливаем название стандарта
         if not self.iso_standard_name and self.iso_standard:

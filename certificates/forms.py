@@ -29,13 +29,15 @@ class CertificateForm(forms.ModelForm):
     
     class Meta:
         model = Certificate
-        fields = ['name', 'inn', 'address', 'certificate_number_part', 'iso_standard',
+        fields = ['name', 'identifier_type', 'identifier_value', 'address', 'certificate_number_part', 'iso_standard',
                   'iso_standard_name', 'quality_management_system', 'start_date', 'expiry_date',
                   'status', 'first_inspection_date', 'first_inspection_status',
                   'second_inspection_date', 'second_inspection_status',
                   'file1', 'file1_psd', 'file2', 'file2_psd', 'file3', 'client_email', 'notifications_enabled',
                   'validity_period', 'certification_area', 'qr_code']
         widgets = {
+            'identifier_type': forms.RadioSelect(),
+            'identifier_value': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите номер'}),
             'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'expiry_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'first_inspection_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
@@ -53,6 +55,10 @@ class CertificateForm(forms.ModelForm):
         
         if not self.instance.pk:
             self.fields['certificate_number_part'].initial = self.get_next_number()
+        
+        # Инициализация полей идентификатора
+        self.fields['identifier_type'].label = 'Тип идентификатора'
+        self.fields['identifier_value'].label = 'Номер идентификатора'
 
     def clean_certificate_number_part(self):
         part = self.cleaned_data['certificate_number_part']

@@ -49,12 +49,31 @@
             </div>
             
             <div class="mb-3">
-                <label for="{{ form.inn.id_for_label }}" class="form-label">{{ form.inn.label }}</label>
-                {{ form.inn }}
-                {% if form.inn.errors %}
-                <div class="text-danger">
-                    {{ form.inn.errors }}
+                <label class="form-label">{{ form.identifier_type.label }}</label>
+                <div class="d-flex gap-3 mb-2">
+                    {% for choice in form.identifier_type %}
+                        <div class="form-check">
+                            {{ choice.tag }}
+                            <label class="form-check-label" for="{{ choice.id_for_label }}">
+                                {{ choice.choice_label }}
+                            </label>
+                        </div>
+                    {% endfor %}
                 </div>
+                {% if form.identifier_type.errors %}
+                    <div class="text-danger">
+                        {{ form.identifier_type.errors }}
+                    </div>
+                {% endif %}
+            </div>
+            
+            <div class="mb-3">
+                <label for="{{ form.identifier_value.id_for_label }}" class="form-label" id="identifier-label">{{ form.identifier_value.label }}</label>
+                {{ form.identifier_value }}
+                {% if form.identifier_value.errors %}
+                    <div class="text-danger">
+                        {{ form.identifier_value.errors }}
+                    </div>
                 {% endif %}
             </div>
             
@@ -468,6 +487,31 @@ document.addEventListener('DOMContentLoaded', function() {
         
         formsContainer.appendChild(newForm);
         totalForms.value = formCount + 1;
+    });
+
+    // JavaScript для переключения между ИНН и УНП
+    function updateIdentifierLabel() {
+        const identifierType = document.querySelector('input[name="identifier_type"]:checked');
+        const label = document.getElementById('identifier-label');
+        const input = document.querySelector('input[name="identifier_value"]');
+        
+        if (identifierType && label && input) {
+            if (identifierType.value === 'unp') {
+                label.textContent = 'Номер УНП:';
+                input.placeholder = 'Введите номер УНП';
+            } else {
+                label.textContent = 'Номер ИНН:';
+                input.placeholder = 'Введите номер ИНН';
+            }
+        }
+    }
+    
+    // Инициализация при загрузке
+    updateIdentifierLabel();
+    
+    // Обновление при изменении типа
+    document.querySelectorAll('input[name="identifier_type"]').forEach(function(radio) {
+        radio.addEventListener('change', updateIdentifierLabel);
     });
 });
 </script>

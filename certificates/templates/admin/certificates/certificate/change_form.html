@@ -1,0 +1,28 @@
+{% extends "admin/change_form.html" %}
+
+{% block admin_change_form_document_ready %}
+{{ block.super }}
+<script>
+(function($) {
+    function updateIdentifierLabel() {
+        var identifierType = $('input[name="identifier_type"]:checked').val();
+        var label = identifierType === 'unp' ? 'Номер УНП:' : 'Номер ИНН:';
+        var placeholder = identifierType === 'unp' ? 'Введите номер УНП' : 'Введите номер ИНН';
+        
+        // Обновляем label
+        $('label[for="id_identifier_value"]').text(label);
+        
+        // Обновляем placeholder
+        $('#id_identifier_value').attr('placeholder', placeholder);
+    }
+    
+    // Инициализация при загрузке
+    updateIdentifierLabel();
+    
+    // Обновление при изменении типа
+    $('input[name="identifier_type"]').change(function() {
+        updateIdentifierLabel();
+    });
+})(django.jQuery);
+</script>
+{% endblock %}

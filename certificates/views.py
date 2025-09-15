@@ -114,6 +114,9 @@ def search_results(request):
             query |= Q(certificate_number_part__iexact=parts[1])
         else:
             query |= Q(certificate_number_part__icontains=search_query)
+            query |= Q(name__icontains=search_query)
+            query |= Q(identifier_value__icontains=search_query)
+            query |= Q(inn__icontains=search_query)  # Для обратной совместимости
         
         certificates = Certificate.objects.filter(query)
         
