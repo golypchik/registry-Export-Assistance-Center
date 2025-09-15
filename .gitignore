@@ -128,7 +128,9 @@ media/
 
 # Static files (if collected)
 staticfiles/
-static/
+static_collected/
+# Allow app-specific static files
+!certificates/static/
 
 # IDE files
 .vscode/
@@ -155,5 +157,3 @@ secret_key.txt
 *.pyc
 __pycache__/
 db.sqlite3
-staticfiles/
-media/
