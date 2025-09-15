@@ -107,7 +107,14 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Разные STATIC_ROOT для локальной разработки и продакшена
+if 'RENDER' in os.environ or 'RAILWAY_ENVIRONMENT' in os.environ or not DEBUG:
+    # Для продакшена - Render ожидает staticfiles
+    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+else:
+    # Для локальной разработки используем static_collected
+    STATIC_ROOT = os.path.join(BASE_DIR, 'static_collected')
 
 # Directories where Django will search for static files
 STATICFILES_DIRS = []
@@ -125,7 +132,6 @@ if 'RENDER' in os.environ or 'RAILWAY_ENVIRONMENT' in os.environ or not DEBUG:
     # Дополнительные настройки WhiteNoise для стабильности
     WHITENOISE_SKIP_COMPRESS_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'gz', 'tgz', 'bz2', 'tbz', 'xz', 'br']
     WHITENOISE_MAX_AGE = 86400  # 24 часа кеширования
-    WHITENOISE_USE_FINDERS = True  # Позволяет находить статические файлы без collectstatic
 else:
     # Для разработки используем стандартный статический хранилище
     STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
