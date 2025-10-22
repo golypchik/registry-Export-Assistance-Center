@@ -1,0 +1,91 @@
+{% extends "admin/change_form.html" %}
+
+{% block admin_change_form_document_ready %}
+{{ block.super }}
+<script>
+(function($) {
+    // Функция для обновления наименования стандарта при изменении ISO стандарта
+    function updateISOStandardName() {
+        var isoStandardId = $('#id_iso_standard').val();
+        
+        if (!isoStandardId) {
+            $('#id_iso_standard_name').val('');
+            return;
+        }
+        
+        // Делаем AJAX запрос для получения данных ISO стандарта
+        $.ajax({
+            url: '/admin/certificates/certificate/get-iso-standard/' + isoStandardId + '/',
+            method: 'GET',
+            success: function(response) {
+                if (response.status === 'success' && response.data) {
+                    $('#id_iso_standard_name').val(response.data.certificate_standard_name);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Ошибка при получении данных ISO стандарта:', error);
+            }
+        });
+    }
+    
+    // Функция для предзаполнения аудиторов
+    function populateAuditors() {
+        {% if duplicate_auditors %}
+        try {
+            var auditors = JSON.parse('{{ duplicate_auditors|escapejs }}');
+            console.log('Найдено аудиторов для предзаполнения:', auditors);
+            
+            if (auditors && auditors.length > 0) {
+                // Находим все формы аудиторов
+                var auditorForms = $('.form-row').filter(function() {
+                    return $(this).find('input[name*="auditors"][name*="full_name"]').length > 0;
+                });
+                
+                console.log('Найдено форм аудиторов:', auditorForms.length);
+                
+                // Предзаполняем каждую форму
+                auditors.forEach(function(auditor, index) {
+                    if (index < auditorForms.length) {
+                        var form = $(auditorForms[index]);
+                        var nameInput = form.find('input[name*="auditors"][name*="full_name"]');
+                        
+                        if (nameInput.length > 0) {
+                            nameInput.val(auditor.full_name);
+                            console.log('Предзаполнен аудитор:', auditor.full_name);
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Ошибка при парсинге данных аудиторов:', e);
+        }
+        {% endif %}
+    }
+    
+    // Инициализация при загрузке
+    updateISOStandardName();
+    
+    // Делаем поле iso_standard_name readonly, но с возможностью обновления через JavaScript
+    $('#id_iso_standard_name').prop('readonly', true).css({
+        'background-color': '#2b2b2b',
+        'color': '#ffffff',
+        'border-color': '#404040',
+        'cursor': 'not-allowed'
+    });
+    
+    // Обновление наименования стандарта при изменении ISO стандарта
+    $('#id_iso_standard').change(function() {
+        updateISOStandardName();
+    });
+    
+    // Предзаполнение аудиторов
+    populateAuditors();
+    
+    // Дополнительная попытка предзаполнения через небольшую задержку
+    setTimeout(function() {
+        populateAuditors();
+    }, 1000);
+    
+})(django.jQuery);
+</script>
+{% endblock %}

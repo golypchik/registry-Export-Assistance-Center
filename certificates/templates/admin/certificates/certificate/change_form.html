@@ -16,13 +16,58 @@
         $('#id_identifier_value').attr('placeholder', placeholder);
     }
     
+    function updateISOStandardName() {
+        var isoStandardId = $('#id_iso_standard').val();
+        
+        if (!isoStandardId) {
+            $('#id_iso_standard_name').val('');
+            return;
+        }
+        
+        // Делаем AJAX запрос для получения данных ISO стандарта
+        $.ajax({
+            url: '/admin/certificates/certificate/get-iso-standard/' + isoStandardId + '/',
+            method: 'GET',
+            success: function(response) {
+                if (response.status === 'success' && response.data) {
+                    $('#id_iso_standard_name').val(response.data.certificate_standard_name);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Ошибка при получении данных ISO стандарта:', error);
+            }
+        });
+    }
+    
     // Инициализация при загрузке
     updateIdentifierLabel();
     
-    // Обновление при изменении типа
+    // Делаем поле iso_standard_name readonly, но с возможностью обновления через JavaScript
+    $('#id_iso_standard_name').prop('readonly', true).css({
+        'background-color': '#2b2b2b',
+        'color': '#ffffff',
+        'border-color': '#404040',
+        'cursor': 'not-allowed'
+    });
+    
+    // Обновление при изменении типа идентификатора
     $('input[name="identifier_type"]').change(function() {
         updateIdentifierLabel();
     });
+    
+    // Обновление наименования стандарта при изменении ISO стандарта
+    $('#id_iso_standard').change(function() {
+        updateISOStandardName();
+    });
+    
+    // Добавляем кнопку дублирования в форму
+    if (window.location.pathname.includes('/change/')) {
+        var objectId = window.location.pathname.match(/\/change\/(\d+)\//);
+        if (objectId) {
+            var duplicateButton = $('<a href="/admin/certificates/certificate/add/?duplicate_from=' + objectId[1] + '" class="button" style="margin-left: 10px;">Дублировать сертификат</a>');
+            $('.submit-row').append(duplicateButton);
+        }
+    }
 })(django.jQuery);
 </script>
 {% endblock %}

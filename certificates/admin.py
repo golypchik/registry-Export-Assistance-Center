@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.conf import settings
 from .models import Certificate, ISOStandard, Auditor
 from .utils import generate_certificate_image, generate_permission_image, generate_audit_image
@@ -98,7 +98,7 @@ class CertificateAdmin(admin.ModelAdmin):
         }),
     )
     
-    readonly_fields = ('file1_preview', 'file2_preview', 'file3_preview', 'iso_standard_name', 'qr_code')
+    readonly_fields = ('file1_preview', 'file2_preview', 'file3_preview', 'qr_code')
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "iso_standard":
@@ -136,6 +136,11 @@ class CertificateAdmin(admin.ModelAdmin):
     
         # Сохраняем модель
         super().save_model(request, obj, form, change)
+        
+        # Очищаем данные дублирования из сессии после успешного сохранения
+        if 'duplicate_certificate_data' in request.session:
+            del request.session['duplicate_certificate_data']
+            logger.info("Данные дублирования очищены из сессии")
     
         # Генерируем документы только если они не были удалены и не были загружены пользователем
         self._generate_documents_if_needed(obj, form, file1_deleted, file1_psd_deleted, 
@@ -281,10 +286,21 @@ class CertificateAdmin(admin.ModelAdmin):
             self.message_user(request, f"Ошибка при скачивании PSD файла: {e}")
     
     download_psd.short_description = "Скачать PSD файл"
+    
+    def duplicate_certificates(self, request, queryset):
+        """Действие для дублирования сертификатов"""
+        if queryset.count() != 1:
+            self.message_user(request, "Пожалуйста, выберите только один сертификат для дублирования.")
+            return
+        
+        certificate = queryset.first()
+        return HttpResponseRedirect(f'/admin/certificates/certificate/add/?duplicate_from={certificate.id}')
+    
+    duplicate_certificates.short_description = "Дублировать сертификат"
 
     
     def get_urls(self):
-        """Добавляем URL для регенерации QR-кода"""
+        """Добавляем URL для регенерации QR-кода и получения данных ISO стандарта"""
         from django.urls import path
         urls = super().get_urls()
         custom_urls = [
@@ -293,8 +309,32 @@ class CertificateAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.regenerate_qr_view),
                 name='certificates_certificate_regenerate_qr',
             ),
+            path(
+                'get-iso-standard/<int:standard_id>/',
+                self.admin_site.admin_view(self.get_iso_standard_data),
+                name='certificates_certificate_get_iso_standard',
+            ),
         ]
         return custom_urls + urls
+    
+    def get_iso_standard_data(self, request, standard_id):
+        """Получение данных ISO стандарта по ID"""
+        from django.http import JsonResponse
+        from django.shortcuts import get_object_or_404
+        
+        try:
+            iso_standard = get_object_or_404(ISOStandard, pk=standard_id)
+            return JsonResponse({
+                'status': 'success',
+                'data': {
+                    'certificate_standard_name': iso_standard.certificate_standard_name,
+                    'certificate_number_prefix': iso_standard.certificate_number_prefix,
+                    'description': iso_standard.description,
+                }
+            })
+        except Exception as e:
+            logger.error(f"Ошибка при получении данных ISO стандарта: {e}")
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
     
     def regenerate_qr_view(self, request, object_id):
         """Представление для регенерации QR-кода"""
@@ -322,6 +362,134 @@ class CertificateAdmin(admin.ModelAdmin):
                 return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
         
         return JsonResponse({'status': 'error', 'message': 'Метод не поддерживается'}, status=405)
+    
+    
+    def get_form(self, request, obj=None, **kwargs):
+        """Переопределяем get_form для поддержки дублирования"""
+        form_class = super().get_form(request, obj, **kwargs)
+        
+        # Если это дублирование и данные есть в сессии
+        if not obj and 'duplicate_certificate_data' in request.session:
+            try:
+                duplicate_data = request.session['duplicate_certificate_data']
+                logger.info(f"Загружаем данные дублирования из сессии: {duplicate_data.get('name', 'Unknown')}")
+                
+                # Создаем кастомный класс формы с предзаполненными данными
+                class DuplicateForm(form_class):
+                    def __init__(self, *args, **kwargs):
+                        super().__init__(*args, **kwargs)
+                        if not self.instance.pk:  # Только для новых объектов
+                            self.initial.update({
+                                'name': duplicate_data.get('name'),
+                                'identifier_type': duplicate_data.get('identifier_type'),
+                                'identifier_value': duplicate_data.get('identifier_value'),
+                                'inn': duplicate_data.get('inn'),
+                                'address': duplicate_data.get('address'),
+                                'certificate_number_part': duplicate_data.get('certificate_number_part'),
+                                'iso_standard': duplicate_data.get('iso_standard_id'),
+                                'iso_standard_name': duplicate_data.get('iso_standard_name'),
+                                'quality_management_system': duplicate_data.get('quality_management_system'),
+                                'start_date': duplicate_data.get('start_date'),
+                                'expiry_date': duplicate_data.get('expiry_date'),
+                                'status': duplicate_data.get('status'),
+                                'first_inspection_date': duplicate_data.get('first_inspection_date'),
+                                'first_inspection_status': duplicate_data.get('first_inspection_status'),
+                                'second_inspection_date': duplicate_data.get('second_inspection_date'),
+                                'second_inspection_status': duplicate_data.get('second_inspection_status'),
+                                'validity_period': duplicate_data.get('validity_period'),
+                                'client_email': duplicate_data.get('client_email'),
+                                'notifications_enabled': duplicate_data.get('notifications_enabled'),
+                                'certification_area': duplicate_data.get('certification_area'),
+                            })
+                            logger.info("Форма предзаполнена данными дублирования")
+                
+                return DuplicateForm
+                
+            except Exception as e:
+                logger.error(f"Ошибка при предзаполнении формы: {str(e)}")
+        
+        return form_class
+    
+    def add_view(self, request, form_url='', extra_context=None):
+        """Переопределяем add_view для поддержки дублирования"""
+        duplicate_from_id = request.GET.get('duplicate_from')
+        
+        if duplicate_from_id:
+            try:
+                logger.info(f"Дублирование сертификата с ID: {duplicate_from_id}")
+                
+                # Получаем сертификат для дублирования
+                original_certificate = Certificate.objects.get(pk=duplicate_from_id)
+                logger.info(f"Найден оригинальный сертификат: {original_certificate.name}")
+                
+                # Собираем данные аудиторов
+                auditors_data = []
+                for auditor in original_certificate.auditors.all():
+                    auditors_data.append({
+                        'full_name': auditor.full_name,
+                    })
+                
+                logger.info(f"Найдено {len(auditors_data)} аудиторов для дублирования")
+                
+                # Сохраняем данные в сессии
+                request.session['duplicate_certificate_data'] = {
+                    'name': original_certificate.name,
+                    'identifier_type': original_certificate.identifier_type,
+                    'identifier_value': original_certificate.identifier_value,
+                    'inn': original_certificate.inn,
+                    'address': original_certificate.address,
+                    'certificate_number_part': Certificate.get_next_number(),
+                    'iso_standard_id': original_certificate.iso_standard.id,
+                    'iso_standard_name': original_certificate.iso_standard_name,
+                    'quality_management_system': original_certificate.quality_management_system,
+                    'start_date': original_certificate.start_date.isoformat(),
+                    'expiry_date': original_certificate.expiry_date.isoformat(),
+                    'status': 'pending',  # Новый сертификат в статусе "В ожидании"
+                    'first_inspection_date': original_certificate.first_inspection_date.isoformat() if original_certificate.first_inspection_date else None,
+                    'first_inspection_status': original_certificate.first_inspection_status,
+                    'second_inspection_date': original_certificate.second_inspection_date.isoformat() if original_certificate.second_inspection_date else None,
+                    'second_inspection_status': original_certificate.second_inspection_status,
+                    'validity_period': original_certificate.validity_period,
+                    'client_email': original_certificate.client_email,
+                    'notifications_enabled': original_certificate.notifications_enabled,
+                    'certification_area': original_certificate.certification_area,
+                    'auditors': auditors_data,
+                }
+                
+                logger.info("Данные сохранены в сессии")
+                
+            except Certificate.DoesNotExist:
+                logger.error(f"Сертификат с ID {duplicate_from_id} не найден")
+            except Exception as e:
+                logger.error(f"Ошибка при дублировании: {str(e)}")
+        
+        return super().add_view(request, form_url, extra_context)
+    
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        """Переопределяем changeform_view для поддержки дублирования аудиторов"""
+        # Если это дублирование и данные есть в сессии
+        if not object_id and 'duplicate_certificate_data' in request.session:
+            try:
+                duplicate_data = request.session['duplicate_certificate_data']
+                auditors_data = duplicate_data.get('auditors', [])
+                
+                if auditors_data:
+                    logger.info(f"Найдено {len(auditors_data)} аудиторов для дублирования")
+                    
+                    # Добавляем данные аудиторов в extra_context
+                    if extra_context is None:
+                        extra_context = {}
+                    
+                    # Преобразуем данные в JSON для JavaScript
+                    import json
+                    extra_context['duplicate_auditors'] = json.dumps(auditors_data)
+                    logger.info("Данные аудиторов добавлены в контекст")
+                
+            except Exception as e:
+                logger.error(f"Ошибка при подготовке данных аудиторов: {str(e)}")
+        
+        return super().changeform_view(request, object_id, form_url, extra_context)
+    
     def qr_code(self, obj):
         """Отображение QR-кода в админке с возможностью регенерации"""
         if obj.qr_code:
@@ -393,7 +561,7 @@ class CertificateAdmin(admin.ModelAdmin):
         return get_file_preview(obj.file3)
     file3_preview.short_description = 'Предпросмотр'
 
-    actions = ['download_psd']
+    actions = ['download_psd', 'duplicate_certificates']
 
     class Media:
         js = ('certificates/js/preview.js',)

@@ -326,8 +326,8 @@ class Certificate(models.Model):
             self.identifier_value = self.inn
             self.identifier_type = 'inn'
         
-        # Устанавливаем название стандарта
-        if not self.iso_standard_name and self.iso_standard:
+        # Устанавливаем название стандарта (обновляем при каждом сохранении если есть iso_standard)
+        if self.iso_standard:
             self.iso_standard_name = self.iso_standard.certificate_standard_name
         
         # Устанавливаем даты инспекций для новых сертификатов
