@@ -9,10 +9,6 @@ urlpatterns = [
     path('permission/<int:certificate_id>/', views.permission_detail, name='permission_detail'),
     path('audit/<int:certificate_id>/<int:auditor_id>/', views.audit_detail, name='audit_detail'),
     
-    # Генерация изображений и предпросмотров
-    path('generate-audit-preview/<int:certificate_id>/<int:auditor_id>/', views.generate_audit_preview, name='generate_audit_preview'),
-    path('generate-audit-image/<int:certificate_id>/<int:auditor_id>/', views.generate_audit_image, name='generate_audit_image'),
-    
     # Административные маршруты
     path('admin/certificates/', views.admin_certificates, name='admin_certificates'),
     path('admin/certificates/add/', views.add_certificate, name='add_certificate'),

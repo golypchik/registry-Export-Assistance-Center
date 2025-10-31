@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponse, FileResponse
+from django.http import HttpResponse, FileResponse, Http404
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from datetime import timedelta
@@ -10,12 +10,9 @@ from django.core.files.base import ContentFile
 from .models import Certificate, ISOStandard, Auditor
 from .tasks import send_notifications_task
 from .forms import CertificateForm, AuditorFormSet
-from .utils import generate_certificate_image, generate_permission_image, generate_audit_image
 import os
-from django.http import HttpResponse, Http404
 from django.conf import settings
 from django.views.static import serve
-from django.contrib.auth.decorators import login_required
 
 def protected_media(request, path):
     """
@@ -36,7 +33,8 @@ def protected_media(request, path):
         raise Http404("Файл не найден")
     
     # Публичные файлы (сертификаты, QR-коды) - доступны всем
-    public_paths = ['certificates/', 'qr_codes/', 'permissions/', 'audit_files/', 'audit_images/']
+    public_paths = ['certificates/', 'qr_codes/', 'permissions/', 'audit_files/', 'audit_images/',
+                    'generated_certificates/', 'generated_permissions/', 'generated_audits/']
     is_public = any(path.startswith(pub_path) for pub_path in public_paths)
     
     # Приватные файлы требуют авторизации
@@ -78,22 +76,6 @@ def delete_certificate(request, certificate_id):
     return render(request, 'certificates/admin/certificate_confirm_delete.html', {
         'certificate': certificate
     })
-
-def generate_audit_preview(request, certificate_id, auditor_id):
-    certificate = get_object_or_404(Certificate, id=certificate_id)
-    auditor = get_object_or_404(Auditor, id=auditor_id, certificate=certificate)
-    
-    if not auditor.audit_number:
-        iso_code = certificate.iso_standard.certificate_number_prefix
-        auditor_index = list(certificate.auditors.all()).index(auditor) + 1
-        auditor.audit_number = f"№AUD.{auditor_index:02d}.{iso_code}"
-        auditor.save()
-
-    image = generate_audit_image(certificate, auditor, auditor.audit_number)
-    
-    response = HttpResponse(content_type="image/png")
-    image.save(response, "PNG")
-    return response
 
 @login_required
 def add_certificate(request):
@@ -196,7 +178,7 @@ def download_file(request, certificate_id, file_num):
     file_mapping = {
         1: certificate.file1,
         2: certificate.file2,
-        3: certificate.file3
+        3: certificate.auditor_certificate
     }
     
     file = file_mapping.get(file_num)
@@ -332,7 +314,7 @@ def delete_certificate_file(request, certificate_id):
     certificate = get_object_or_404(Certificate, id=certificate_id)
     if request.method == 'POST':
         file_field = request.POST.get('file_field')
-        if file_field in ['file1', 'file2', 'file3']:
+        if file_field in ['file1', 'file2', 'auditor_certificate']:
             file_obj = getattr(certificate, file_field)
             if file_obj:
                 file_obj.delete()

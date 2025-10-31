@@ -20,6 +20,13 @@ RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS = [RENDER_EXTERNAL_HOSTNAME, 'localhost', '127.0.0.1']
 
+# Site URL for QR code generation
+SITE_URL = os.environ.get('SITE_URL', 'https://export-center.ru')
+if RENDER_EXTERNAL_HOSTNAME:
+    SITE_URL = f'https://{RENDER_EXTERNAL_HOSTNAME}'
+elif DEBUG:
+    SITE_URL = 'http://localhost:8000'
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',

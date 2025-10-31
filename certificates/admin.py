@@ -1,9 +1,8 @@
 from django.contrib import admin
-from django.utils.html import format_html
+from django.utils.html import format_html, mark_safe
 from django.http import HttpResponse, HttpResponseRedirect
 from django.conf import settings
 from .models import Certificate, ISOStandard, Auditor
-from .utils import generate_certificate_image, generate_permission_image, generate_audit_image
 import re
 import os
 import logging
@@ -35,15 +34,10 @@ class AuditorInline(admin.TabularInline):
     audit_file_preview.short_description = "Предпросмотр файла аудита"
 
 class CertificateAdminForm(forms.ModelForm):
-    delete_file1 = forms.BooleanField(required=False, label='Удалить файл сертификата')
-    delete_file1_psd = forms.BooleanField(required=False, label='Удалить файл сертификата (PSD)')
-    delete_file2 = forms.BooleanField(required=False, label='Удалить файл разрешения')
-    delete_file2_psd = forms.BooleanField(required=False, label='Удалить файл разрешения (PSD)')
-    delete_file3 = forms.BooleanField(required=False, label='Удалить дополнительный файл')
-
     class Meta:
         model = Certificate
         fields = '__all__'
+        exclude = ['auditor_certificate', 'file1', 'file2']
         
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -55,7 +49,7 @@ class CertificateAdmin(admin.ModelAdmin):
     form = CertificateAdminForm
     inlines = [AuditorInline]
     list_display = ('name', 'full_certificate_number', 'display_identifier_info', 'iso_standard', 'iso_standard_name', 'status', 
-                    'first_inspection_status', 'second_inspection_status', 'download_psd_link',
+                    'first_inspection_status', 'second_inspection_status',
                     'start_date', 'expiry_date', 'notifications_enabled')
     list_filter = ('status', 'iso_standard', 'identifier_type', 'first_inspection_status', 'second_inspection_status', 'notifications_enabled')
     search_fields = ('name', 'certificate_number_part', 'identifier_value', 'inn')
@@ -64,12 +58,6 @@ class CertificateAdmin(admin.ModelAdmin):
     def display_identifier_info(self, obj):
         return f"{obj.display_identifier_label}: {obj.display_identifier}"
     display_identifier_info.short_description = "Идентификатор"
-    
-    def download_psd_link(self, obj):
-        if obj.file1_psd:
-            return format_html('<a href="{}">Скачать PSD</a>', obj.file1_psd.url)
-        return "Нет PSD"
-    download_psd_link.short_description = "PSD файл"
 
     exclude = ('additional_files',)
     
@@ -87,10 +75,14 @@ class CertificateAdmin(admin.ModelAdmin):
         }),
         ('Файлы', {
             'fields': (
-                ('file1', 'file1_preview', 'file1_psd'),
-                ('file2', 'file2_preview', 'file2_psd'),
-                ('file3', 'file3_preview'),
-                'qr_code'
+                'permissions_preview',
+                'uploaded_permission',
+                'uploaded_permission_signed',
+                'certificates_preview',
+                'uploaded_certificate',
+                'uploaded_certificate_signed',
+                'qr_code',
+                'auditors_certificates_preview',
             )
         }),
         ('Уведомления', {
@@ -98,7 +90,8 @@ class CertificateAdmin(admin.ModelAdmin):
         }),
     )
     
-    readonly_fields = ('file1_preview', 'file2_preview', 'file3_preview', 'qr_code')
+    readonly_fields = ('permissions_preview', 'certificates_preview', 
+                       'auditors_certificates_preview', 'qr_code')
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "iso_standard":
@@ -106,34 +99,6 @@ class CertificateAdmin(admin.ModelAdmin):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):
-        # Флаги для отслеживания, были ли файлы удалены
-        file1_deleted = form.cleaned_data.get('delete_file1', False)
-        file1_psd_deleted = form.cleaned_data.get('delete_file1_psd', False)
-        file2_deleted = form.cleaned_data.get('delete_file2', False)
-        file2_psd_deleted = form.cleaned_data.get('delete_file2_psd', False)
-        file3_deleted = form.cleaned_data.get('delete_file3', False)
-    
-        # Удаляем файлы, если отмечены для удаления
-        if file1_deleted and obj.file1:
-            obj.file1.delete(save=False)
-            obj.file1 = None
-    
-        if file1_psd_deleted and obj.file1_psd:
-            obj.file1_psd.delete(save=False)
-            obj.file1_psd = None
-    
-        if file2_deleted and obj.file2:
-            obj.file2.delete(save=False)
-            obj.file2 = None
-    
-        if file2_psd_deleted and obj.file2_psd:
-            obj.file2_psd.delete(save=False)
-            obj.file2_psd = None
-
-        if file3_deleted and obj.file3:
-            obj.file3.delete(save=False)
-            obj.file3 = None
-    
         # Сохраняем модель
         super().save_model(request, obj, form, change)
         
@@ -141,80 +106,9 @@ class CertificateAdmin(admin.ModelAdmin):
         if 'duplicate_certificate_data' in request.session:
             del request.session['duplicate_certificate_data']
             logger.info("Данные дублирования очищены из сессии")
-    
-        # Генерируем документы только если они не были удалены и не были загружены пользователем
-        self._generate_documents_if_needed(obj, form, file1_deleted, file1_psd_deleted, 
-                                         file2_deleted, file2_psd_deleted)
-
-    def _generate_documents_if_needed(self, obj, form, file1_deleted, file1_psd_deleted, 
-                                    file2_deleted, file2_psd_deleted):
-        """Генерирует документы только при необходимости"""
-        
-        # Генерируем сертификат (PNG)
-        if not file1_deleted and not obj.file1 and 'file1' not in form.changed_data:
-            self._generate_certificate(obj)
-    
-        # Генерируем сертификат (PSD)
-        if not file1_psd_deleted and not obj.file1_psd and 'file1_psd' not in form.changed_data:
-            self._generate_certificate_psd(obj)
-    
-        # Генерируем разрешение (PNG)
-        if not file2_deleted and not obj.file2 and 'file2' not in form.changed_data:
-            self._generate_permission(obj)
-    
-        # Генерируем разрешение (PSD)
-        if not file2_psd_deleted and not obj.file2_psd and 'file2_psd' not in form.changed_data:
-            self._generate_permission_psd(obj)
-    
-        obj.save()
-
-    def _generate_certificate(self, obj):
-        """Генерирует PNG сертификат"""
-        try:
-            certificate_images = generate_certificate_image(obj)
-            if isinstance(certificate_images, dict):
-                png_image = certificate_images.get('png')
-                if png_image:
-                    obj.file1.save(f'certificates/certificate_{obj.id}.png', png_image, save=False)
-        except Exception as e:
-            # Логируем ошибку, но не прерываем процесс
-            print(f"Ошибка генерации сертификата PNG для {obj.id}: {e}")
-
-    def _generate_certificate_psd(self, obj):
-        """Генерирует PSD сертификат"""
-        try:
-            certificate_images = generate_certificate_image(obj)
-            if isinstance(certificate_images, dict):
-                psd_image = certificate_images.get('psd')
-                if psd_image:
-                    obj.file1_psd.save(f'certificates/certificate_{obj.id}.psd', psd_image, save=False)
-        except Exception as e:
-            print(f"Ошибка генерации сертификата PSD для {obj.id}: {e}")
-
-    def _generate_permission(self, obj):
-        """Генерирует PNG разрешение"""
-        try:
-            permission_images = generate_permission_image(obj)
-            if isinstance(permission_images, dict):
-                png_image = permission_images.get('png')
-                if png_image:
-                    obj.file2.save(f'permissions/permission_{obj.id}.png', png_image, save=False)
-        except Exception as e:
-            print(f"Ошибка генерации разрешения PNG для {obj.id}: {e}")
-
-    def _generate_permission_psd(self, obj):
-        """Генерирует PSD разрешение"""
-        try:
-            permission_images = generate_permission_image(obj)
-            if isinstance(permission_images, dict):
-                psd_image = permission_images.get('psd')
-                if psd_image:
-                    obj.file2_psd.save(f'permissions/permission_{obj.id}.psd', psd_image, save=False)
-        except Exception as e:
-            print(f"Ошибка генерации разрешения PSD для {obj.id}: {e}")
 
     def save_formset(self, request, form, formset, change):
-        """Сохранение формсета аудиторов с генерацией файлов"""
+        """Сохранение формсета аудиторов"""
         instances = formset.save(commit=False)
         
         for instance in instances:
@@ -224,9 +118,6 @@ class CertificateAdmin(admin.ModelAdmin):
                 # Генерируем номер аудита если его нет
                 if not instance.audit_number:
                     instance.audit_number = form.instance.generate_audit_number()
-                
-                # Генерируем файлы аудита
-                self._generate_audit_files(form.instance, instance)
             
             instance.save()
         
@@ -236,57 +127,6 @@ class CertificateAdmin(admin.ModelAdmin):
         
         formset.save_m2m()
 
-    def _generate_audit_files(self, certificate, auditor):
-        """Генерирует файлы аудита для аудитора"""
-        try:
-            if not auditor.audit_file or not auditor.audit_file_psd:
-                audit_images = generate_audit_image(certificate, auditor, auditor.audit_number)
-                if isinstance(audit_images, dict):
-                    png_image = audit_images.get('png')
-                    psd_image = audit_images.get('psd')
-                    
-                    if png_image and not auditor.audit_file:
-                        auditor.audit_file.save(
-                            f'audit_files/audit_{certificate.id}_{auditor.id}.png', 
-                            png_image, 
-                            save=False
-                        )
-                    
-                    if psd_image and not auditor.audit_file_psd:
-                        auditor.audit_file_psd.save(
-                            f'audit_files/audit_{certificate.id}_{auditor.id}.psd', 
-                            psd_image, 
-                            save=False
-                        )
-        except Exception as e:
-            print(f"Ошибка генерации файлов аудита для аудитора {auditor.id}: {e}")
-
-    def download_psd(self, request, queryset):
-        """Действие для скачивания PSD файлов"""
-        if queryset.count() != 1:
-            self.message_user(request, "Пожалуйста, выберите только один сертификат.")
-            return
-    
-        certificate = queryset.first()
-        if not certificate.file1_psd:
-            self.message_user(request, "PSD файл не найден для этого сертификата.")
-            return
-            
-        try:
-            # Получаем содержимое PSD файла
-            psd_content = certificate.file1_psd.read()
-            
-            # Создаем HTTP ответ для скачивания
-            response = HttpResponse(psd_content, content_type='application/octet-stream')
-            filename = os.path.basename(certificate.file1_psd.name)
-            response['Content-Disposition'] = f'attachment; filename="{filename}"'
-            return response
-            
-        except Exception as e:
-            self.message_user(request, f"Ошибка при скачивании PSD файла: {e}")
-    
-    download_psd.short_description = "Скачать PSD файл"
-    
     def duplicate_certificates(self, request, queryset):
         """Действие для дублирования сертификатов"""
         if queryset.count() != 1:
@@ -300,7 +140,7 @@ class CertificateAdmin(admin.ModelAdmin):
 
     
     def get_urls(self):
-        """Добавляем URL для регенерации QR-кода и получения данных ISO стандарта"""
+        """Добавляем URL для регенерации QR-кода, получения данных ISO стандарта и регенерации сертификатов"""
         from django.urls import path
         urls = super().get_urls()
         custom_urls = [
@@ -308,6 +148,11 @@ class CertificateAdmin(admin.ModelAdmin):
                 '<int:object_id>/regenerate-qr/',
                 self.admin_site.admin_view(self.regenerate_qr_view),
                 name='certificates_certificate_regenerate_qr',
+            ),
+            path(
+                '<int:object_id>/regenerate-certificates/',
+                self.admin_site.admin_view(self.regenerate_certificates_view),
+                name='certificates_certificate_regenerate_certificates',
             ),
             path(
                 'get-iso-standard/<int:standard_id>/',
@@ -359,6 +204,32 @@ class CertificateAdmin(admin.ModelAdmin):
                     
             except Exception as e:
                 logger.error(f"Ошибка при регенерации QR-кода: {e}")
+                return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        
+        return JsonResponse({'status': 'error', 'message': 'Метод не поддерживается'}, status=405)
+    
+    def regenerate_certificates_view(self, request, object_id):
+        """Представление для ручной регенерации сертификатов"""
+        from django.http import JsonResponse
+        from django.shortcuts import get_object_or_404
+        from .certificate_generator import generate_all_certificates
+        
+        if request.method == 'POST':
+            try:
+                certificate = get_object_or_404(Certificate, pk=object_id)
+                
+                # Проверяем наличие QR-кода
+                if not certificate.qr_code:
+                    return JsonResponse({'status': 'error', 'message': 'Сначала необходимо создать QR-код'}, status=400)
+                
+                # Генерируем все сертификаты
+                if generate_all_certificates(certificate):
+                    return JsonResponse({'status': 'success', 'message': 'Все сертификаты успешно сгенерированы'})
+                else:
+                    return JsonResponse({'status': 'error', 'message': 'Ошибка при генерации сертификатов'}, status=500)
+                    
+            except Exception as e:
+                logger.error(f"Ошибка при регенерации сертификатов: {e}")
                 return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
         
         return JsonResponse({'status': 'error', 'message': 'Метод не поддерживается'}, status=405)
@@ -546,22 +417,190 @@ class CertificateAdmin(admin.ModelAdmin):
         )
     qr_code.short_description = 'QR-код'
 
-    def file1_preview(self, obj):
-        """Предпросмотр файла сертификата"""
-        return get_file_preview(obj.file1)
-    file1_preview.short_description = 'Предпросмотр'
+    def certificates_preview(self, obj):
+        """Превью сертификатов с возможностью замены загруженными файлами"""
+        if not obj.pk:
+            return "Сохраните сертификат для просмотра"
+        
+        html_parts = []
+        html_parts.append('<div style="display: flex; flex-direction: column; gap: 10px;">')
+        html_parts.append('<h4 style="margin: 0 0 10px 0; color: #333;">Сертификат соответствия</h4>')
+        
+        # Сертификат (без подписей) - приоритет: uploaded > generated
+        cert_image = obj.get_certificate_image(with_signatures=False)
+        if cert_image:
+            source_text = "📤 Загружен" if obj.uploaded_certificate else "🤖 Сгенерирован"
+            html_parts.append(
+                '<div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #f9f9f9;">'
+                '<strong style="color: #0073aa;">✓ Без подписей:</strong> <span style="font-size: 11px; color: #666;">({})</span><br>'
+                '<a href="{}" target="_blank">'
+                '<img src="{}" style="max-width: 150px; cursor: pointer; margin-top: 5px; border: 1px solid #ccc;" '
+                'title="Нажмите для открытия в полном размере" onerror="this.style.display=\'none\'; this.nextSibling.style.display=\'block\';">'
+                '</a>'
+                '<span style="display:none; color: red;">Ошибка загрузки изображения</span><br>'
+                '<a href="{}" download style="font-size: 11px; color: #0073aa;">⬇ Скачать</a>'
+                '</div>'.format(
+                    source_text,
+                    cert_image.url,
+                    cert_image.url,
+                    cert_image.url
+                )
+            )
+        else:
+            html_parts.append('<div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #fff3cd;">'
+                            '<strong>⚠ Без подписей:</strong> Не сгенерирован. Загрузите файл ниже.</div>')
+        
+        # Сертификат (с подписями) - приоритет: uploaded > generated
+        cert_signed_image = obj.get_certificate_image(with_signatures=True)
+        if cert_signed_image:
+            source_text = "📤 Загружен" if obj.uploaded_certificate_signed else "🤖 Сгенерирован"
+            html_parts.append(
+                '<div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #f9f9f9;">'
+                '<strong style="color: #0073aa;">✓ С подписями:</strong> <span style="font-size: 11px; color: #666;">({})</span><br>'
+                '<a href="{}" target="_blank">'
+                '<img src="{}" style="max-width: 150px; cursor: pointer; margin-top: 5px; border: 1px solid #ccc;" '
+                'title="Нажмите для открытия в полном размере" onerror="this.style.display=\'none\'; this.nextSibling.style.display=\'block\';">'
+                '</a>'
+                '<span style="display:none; color: red;">Ошибка загрузки изображения</span><br>'
+                '<a href="{}" download style="font-size: 11px; color: #0073aa;">⬇ Скачать</a>'
+                '</div>'.format(
+                    source_text,
+                    cert_signed_image.url,
+                    cert_signed_image.url,
+                    cert_signed_image.url
+                )
+            )
+        else:
+            html_parts.append('<div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #fff3cd;">'
+                            '<strong>⚠ С подписями:</strong> Не сгенерирован. Загрузите файл ниже.</div>')
+        
+        html_parts.append('</div>')
+        result_html = ''.join(html_parts)
+        return format_html(result_html)
+    certificates_preview.short_description = 'Сертификаты соответствия (просмотр)'
     
-    def file2_preview(self, obj):
-        """Предпросмотр файла разрешения"""
-        return get_file_preview(obj.file2)
-    file2_preview.short_description = 'Предпросмотр'
+    def permissions_preview(self, obj):
+        """Превью разрешений с возможностью замены загруженными файлами"""
+        if not obj.pk:
+            return "Сохраните сертификат для просмотра"
+        
+        html_parts = []
+        html_parts.append('<div style="display: flex; flex-direction: column; gap: 10px;">')
+        html_parts.append('<h4 style="margin: 0 0 10px 0; color: #333;">Разрешение на применение знака</h4>')
+        
+        # Разрешение (без подписей) - приоритет: uploaded > generated
+        perm_image = obj.get_permission_image(with_signatures=False)
+        if perm_image:
+            source_text = "📤 Загружено" if obj.uploaded_permission else "🤖 Сгенерировано"
+            html_parts.append(
+                '<div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #f0f8ff;">'
+                '<strong style="color: #28a745;">✓ Без подписей:</strong> <span style="font-size: 11px; color: #666;">({})</span><br>'
+                '<a href="{}" target="_blank">'
+                '<img src="{}" style="max-width: 150px; cursor: pointer; margin-top: 5px; border: 1px solid #ccc;" '
+                'title="Нажмите для открытия в полном размере" onerror="this.style.display=\'none\'; this.nextSibling.style.display=\'block\';">'
+                '</a>'
+                '<span style="display:none; color: red;">Ошибка загрузки изображения</span><br>'
+                '<a href="{}" download style="font-size: 11px; color: #28a745;">⬇ Скачать</a>'
+                '</div>'.format(
+                    source_text,
+                    perm_image.url,
+                    perm_image.url,
+                    perm_image.url
+                )
+            )
+        else:
+            html_parts.append('<div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #fff3cd;">'
+                            '<strong>⚠ Без подписей:</strong> Не сгенерировано. Загрузите файл ниже.</div>')
+        
+        # Разрешение (с подписями) - приоритет: uploaded > generated
+        perm_signed_image = obj.get_permission_image(with_signatures=True)
+        if perm_signed_image:
+            source_text = "📤 Загружено" if obj.uploaded_permission_signed else "🤖 Сгенерировано"
+            html_parts.append(
+                '<div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #f0f8ff;">'
+                '<strong style="color: #28a745;">✓ С подписями:</strong> <span style="font-size: 11px; color: #666;">({})</span><br>'
+                '<a href="{}" target="_blank">'
+                '<img src="{}" style="max-width: 150px; cursor: pointer; margin-top: 5px; border: 1px solid #ccc;" '
+                'title="Нажмите для открытия в полном размере" onerror="this.style.display=\'none\'; this.nextSibling.style.display=\'block\';">'
+                '</a>'
+                '<span style="display:none; color: red;">Ошибка загрузки изображения</span><br>'
+                '<a href="{}" download style="font-size: 11px; color: #28a745;">⬇ Скачать</a>'
+                '</div>'.format(
+                    source_text,
+                    perm_signed_image.url,
+                    perm_signed_image.url,
+                    perm_signed_image.url
+                )
+            )
+        else:
+            html_parts.append('<div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #fff3cd;">'
+                            '<strong>⚠ С подписями:</strong> Не сгенерировано. Загрузите файл ниже.</div>')
+        
+        html_parts.append('</div>')
+        result_html = ''.join(html_parts)
+        return format_html(result_html)
+    permissions_preview.short_description = 'Разрешения на знак (просмотр)'
     
-    def file3_preview(self, obj):
-        """Предпросмотр дополнительного файла"""
-        return get_file_preview(obj.file3)
-    file3_preview.short_description = 'Предпросмотр'
+    def auditors_certificates_preview(self, obj):
+        """Предпросмотр всех сертификатов аудиторов"""
+        if not obj.pk:
+            return "Сохраните сертификат для просмотра"
+        
+        auditors = obj.auditors.all()
+        
+        if not auditors:
+            return "Нет аудиторов"
+        
+        result_html = '<div style="display: flex; flex-direction: column; gap: 15px;">'
+        
+        for auditor in auditors:
+            result_html += format_html(
+                '<div style="border: 2px solid #2b2b2b; padding: 15px; border-radius: 8px; background: #1a1a1a;">'
+                '<h3 style="margin-top: 0; color: #4a9eff;">{}</h3>',
+                auditor.full_name
+            )
+            
+            # Сгенерированный аудит (без подписей)
+            if auditor.generated_audit:
+                result_html += format_html(
+                    '<div style="margin-bottom: 10px;">'
+                    '<strong style="color: #ccc;">Без подписей:</strong><br>'
+                    '<a href="{}" target="_blank">'
+                    '<img src="{}" style="max-width: 150px; cursor: pointer; margin-top: 5px; border: 1px solid #444;" title="Нажмите для открытия в полном размере">'
+                    '</a><br>'
+                    '<a href="{}" download style="font-size: 11px; color: #4a9eff;">Скачать</a>'
+                    '</div>',
+                    auditor.generated_audit.url,
+                    auditor.generated_audit.url,
+                    auditor.generated_audit.url
+                )
+            else:
+                result_html += '<div style="margin-bottom: 10px; color: #888;">Без подписей: Не сгенерирован</div>'
+            
+            # Сгенерированный аудит (с подписями)
+            if auditor.generated_audit_signed:
+                result_html += format_html(
+                    '<div>'
+                    '<strong style="color: #ccc;">С подписями:</strong><br>'
+                    '<a href="{}" target="_blank">'
+                    '<img src="{}" style="max-width: 150px; cursor: pointer; margin-top: 5px; border: 1px solid #444;" title="Нажмите для открытия в полном размере">'
+                    '</a><br>'
+                    '<a href="{}" download style="font-size: 11px; color: #4a9eff;">Скачать</a>'
+                    '</div>',
+                    auditor.generated_audit_signed.url,
+                    auditor.generated_audit_signed.url,
+                    auditor.generated_audit_signed.url
+                )
+            else:
+                result_html += '<div style="color: #888;">С подписями: Не сгенерирован</div>'
+            
+            result_html += '</div>'
+        
+        result_html += '</div>'
+        return format_html(result_html)
+    auditors_certificates_preview.short_description = 'Сертификаты аудиторов'
 
-    actions = ['download_psd', 'duplicate_certificates']
+    actions = ['duplicate_certificates']
 
     class Media:
         js = ('certificates/js/preview.js',)
@@ -574,7 +613,6 @@ class ISOStandardAdmin(admin.ModelAdmin):
 
 class AuditorAdminForm(forms.ModelForm):
     clear_audit_file = forms.BooleanField(required=False, label='Очистить файл аудита')
-    clear_audit_file_psd = forms.BooleanField(required=False, label='Очистить файл аудита (PSD)')
 
     class Meta:
         model = Auditor
@@ -586,22 +624,74 @@ class AuditorAdmin(admin.ModelAdmin):
     list_display = ('full_name', 'certificate', 'audit_number', 'audit_file_preview')
     list_filter = ('certificate__iso_standard', 'certificate__status')
     search_fields = ('full_name', 'certificate__name', 'certificate__certificate_number_part')
-    readonly_fields = ('audit_file_preview', 'audit_number')
+    readonly_fields = ('audit_file_preview_with_generated', 'audit_number')
     
     fieldsets = (
         ('Основная информация', {
             'fields': ('certificate', 'full_name', 'audit_number')
         }),
-        ('Файлы аудита', {
-            'fields': ('audit_file', 'audit_file_psd', 'audit_file_preview', 
-                        'clear_audit_file', 'clear_audit_file_psd')
+        ('Файлы', {
+            'fields': ('audit_file', 'audit_file_preview_with_generated', 
+                      'uploaded_audit', 'uploaded_audit_signed',
+                      'clear_audit_file')
         }),
     )
 
     def audit_file_preview(self, obj):
-        """Предпросмотр файла аудита"""
+        """Предпросмотр файла аудита для списка"""
         return get_file_preview(obj.audit_file)
     audit_file_preview.short_description = 'Предпросмотр файла аудита'
+    
+    def audit_file_preview_with_generated(self, obj):
+        """Предпросмотр файла аудита с возможностью замены загруженными файлами"""
+        if not obj.pk:
+            return "Сохраните аудитора для просмотра файлов"
+        
+        result_html = '<div style="display: flex; flex-direction: column; gap: 10px;">'
+        
+        # Аудит (без подписей) - приоритет: uploaded > generated
+        audit_image = obj.get_audit_image(with_signatures=False)
+        if audit_image:
+            source_text = "📤 Загружен" if obj.uploaded_audit else "🤖 Сгенерирован"
+            result_html += format_html(
+                '<div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px;">'
+                '<strong>Без подписей:</strong> <span style="font-size: 11px; color: #666;">({})</span><br>'
+                '<a href="{}" target="_blank">'
+                '<img src="{}" style="max-width: 150px; cursor: pointer; margin-top: 5px;" title="Нажмите для открытия в полном размере">'
+                '</a><br>'
+                '<a href="{}" download style="font-size: 11px;">Скачать</a>'
+                '</div>',
+                source_text,
+                audit_image.url,
+                audit_image.url,
+                audit_image.url
+            )
+        else:
+            result_html += '<div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px;">Без подписей: Не сгенерирован. Загрузите файл ниже.</div>'
+        
+        # Аудит (с подписями) - приоритет: uploaded > generated
+        audit_signed_image = obj.get_audit_image(with_signatures=True)
+        if audit_signed_image:
+            source_text = "📤 Загружен" if obj.uploaded_audit_signed else "🤖 Сгенерирован"
+            result_html += format_html(
+                '<div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px;">'
+                '<strong>С подписями:</strong> <span style="font-size: 11px; color: #666;">({})</span><br>'
+                '<a href="{}" target="_blank">'
+                '<img src="{}" style="max-width: 150px; cursor: pointer; margin-top: 5px;" title="Нажмите для открытия в полном размере">'
+                '</a><br>'
+                '<a href="{}" download style="font-size: 11px;">Скачать</a>'
+                '</div>',
+                source_text,
+                audit_signed_image.url,
+                audit_signed_image.url,
+                audit_signed_image.url
+            )
+        else:
+            result_html += '<div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px;">С подписями: Не сгенерирован. Загрузите файл ниже.</div>'
+        
+        result_html += '</div>'
+        return format_html(result_html)
+    audit_file_preview_with_generated.short_description = 'Предпросмотр'
 
     def save_model(self, request, obj, form, change):
         """Сохранение модели аудитора с обработкой очистки файлов"""
@@ -609,44 +699,9 @@ class AuditorAdmin(admin.ModelAdmin):
         if form.cleaned_data.get('clear_audit_file') and obj.audit_file:
             obj.audit_file.delete(save=False)
             obj.audit_file = None
-            
-        if form.cleaned_data.get('clear_audit_file_psd') and obj.audit_file_psd:
-            obj.audit_file_psd.delete(save=False)
-            obj.audit_file_psd = None
 
         # Генерируем номер аудита если его нет
         if not obj.audit_number and obj.certificate:
             obj.audit_number = obj.certificate.generate_audit_number()
 
         super().save_model(request, obj, form, change)
-
-        # Генерируем файлы аудита если они отсутствуют
-        if obj.certificate and (not obj.audit_file or not obj.audit_file_psd):
-            self._generate_audit_files_for_auditor(obj)
-
-    def _generate_audit_files_for_auditor(self, auditor):
-        """Генерирует файлы аудита для конкретного аудитора"""
-        try:
-            audit_images = generate_audit_image(auditor.certificate, auditor, auditor.audit_number)
-            if isinstance(audit_images, dict):
-                png_image = audit_images.get('png')
-                psd_image = audit_images.get('psd')
-                
-                if png_image and not auditor.audit_file:
-                    auditor.audit_file.save(
-                        f'audit_files/audit_{auditor.certificate.id}_{auditor.id}.png',
-                        png_image,
-                        save=False
-                    )
-                
-                if psd_image and not auditor.audit_file_psd:
-                    auditor.audit_file_psd.save(
-                        f'audit_files/audit_{auditor.certificate.id}_{auditor.id}.psd',
-                        psd_image,
-                        save=False
-                    )
-                
-                auditor.save()
-                
-        except Exception as e:
-            print(f"Ошибка генерации файлов аудита для аудитора {auditor.id}: {e}")

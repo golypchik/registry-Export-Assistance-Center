@@ -22,10 +22,8 @@ class CertificateForm(forms.ModelForm):
     
     # Поля для удаления файлов
     file1_cleared = forms.BooleanField(required=False, label="Удалить файл сертификата")
-    file1_psd_cleared = forms.BooleanField(required=False, label="Удалить PSD файл сертификата")
     file2_cleared = forms.BooleanField(required=False, label="Удалить файл приложения")
-    file2_psd_cleared = forms.BooleanField(required=False, label="Удалить PSD файл приложения")
-    file3_cleared = forms.BooleanField(required=False, label="Удалить дополнительный файл")
+    auditor_certificate_cleared = forms.BooleanField(required=False, label="Удалить сертификат аудитора")
     
     class Meta:
         model = Certificate
@@ -33,7 +31,7 @@ class CertificateForm(forms.ModelForm):
                   'iso_standard_name', 'quality_management_system', 'start_date', 'expiry_date',
                   'status', 'first_inspection_date', 'first_inspection_status',
                   'second_inspection_date', 'second_inspection_status',
-                  'file1', 'file1_psd', 'file2', 'file2_psd', 'file3', 'client_email', 'notifications_enabled',
+                  'file1', 'file2', 'auditor_certificate', 'client_email', 'notifications_enabled',
                   'validity_period', 'certification_area', 'qr_code']
         widgets = {
             'identifier_type': forms.RadioSelect(),
@@ -84,10 +82,8 @@ class CertificateForm(forms.ModelForm):
         # Проверка конфликтов между загрузкой новых файлов и их удалением
         file_fields = [
             ('file1', 'file1_cleared'),
-            ('file1_psd', 'file1_psd_cleared'),
             ('file2', 'file2_cleared'),
-            ('file2_psd', 'file2_psd_cleared'),
-            ('file3', 'file3_cleared')
+            ('auditor_certificate', 'auditor_certificate_cleared')
         ]
         
         for file_field, clear_field in file_fields:
@@ -98,11 +94,10 @@ class CertificateForm(forms.ModelForm):
 
 class AuditorForm(forms.ModelForm):
     clear_audit_file = forms.BooleanField(required=False, label='Очистить файл аудита')
-    clear_audit_file_psd = forms.BooleanField(required=False, label='Очистить PSD файл аудита')
 
     class Meta:
         model = Auditor
-        fields = ('full_name', 'audit_file', 'audit_file_psd')
+        fields = ('full_name', 'audit_file')
 
     audit_file_preview = forms.CharField(widget=forms.HiddenInput(), required=False)
 
@@ -110,8 +105,6 @@ class AuditorForm(forms.ModelForm):
         cleaned_data = super().clean()
         if cleaned_data.get('clear_audit_file') and cleaned_data.get('audit_file'):
             self.add_error('audit_file', 'Нельзя одновременно загрузить новый файл и очистить существующий')
-        if cleaned_data.get('clear_audit_file_psd') and cleaned_data.get('audit_file_psd'):
-            self.add_error('audit_file_psd', 'Нельзя одновременно загрузить новый PSD файл и очистить существующий')
         return cleaned_data
 
 AuditorFormSet = inlineformset_factory(

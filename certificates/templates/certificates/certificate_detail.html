@@ -117,28 +117,128 @@
                         </div>
                         {% endif %}
                         
+                        <!-- Сертификаты и разрешения (приоритет: загруженные > сгенерированные) -->
+                        {% if certificate.display_certificate_signed or certificate.display_permission_signed %}
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="fw-bold text-primary mb-3">Сертификаты и разрешения:</h6>
+                                <div class="row">
+                                    {% if certificate.display_certificate_signed %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card h-100">
+                                            <div class="card-header bg-primary text-white">
+                                                <small>Сертификат соответствия</small>
+                                            </div>
+                                            <div class="card-body text-center p-2">
+                                                <a href="{{ certificate.display_certificate_signed.url }}" target="_blank">
+                                                    <img src="{{ certificate.display_certificate_signed.url }}" 
+                                                         alt="Сертификат соответствия" 
+                                                         class="img-fluid border"
+                                                         style="max-height: 400px; cursor: pointer;">
+                                                </a>
+                                                <div class="mt-2">
+                                                    <a href="{{ certificate.display_certificate_signed.url }}" 
+                                                       download 
+                                                       class="btn btn-sm btn-outline-primary">
+                                                        <i class="fas fa-download"></i> Скачать
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if certificate.display_permission_signed %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card h-100">
+                                            <div class="card-header bg-success text-white">
+                                                <small>Разрешение на применение знака соответствия</small>
+                                            </div>
+                                            <div class="card-body text-center p-2">
+                                                <a href="{{ certificate.display_permission_signed.url }}" target="_blank">
+                                                    <img src="{{ certificate.display_permission_signed.url }}" 
+                                                         alt="Разрешение" 
+                                                         class="img-fluid border"
+                                                         style="max-height: 400px; cursor: pointer;">
+                                                </a>
+                                                <div class="mt-2">
+                                                    <a href="{{ certificate.display_permission_signed.url }}" 
+                                                       download 
+                                                       class="btn btn-sm btn-outline-success">
+                                                        <i class="fas fa-download"></i> Скачать
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Аудиты -->
+                        {% if certificate.auditors.all %}
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="fw-bold text-info mb-3">Аудиты:</h6>
+                                <div class="row">
+                                    {% for auditor in certificate.auditors.all %}
+                                        {% if auditor.display_audit_signed %}
+                                        <div class="col-md-6 mb-3">
+                                            <div class="card h-100">
+                                                <div class="card-header bg-info text-white">
+                                                    <small>Аудит - {{ auditor.full_name }}</small>
+                                                </div>
+                                                <div class="card-body text-center p-2">
+                                                    <a href="{{ auditor.display_audit_signed.url }}" target="_blank">
+                                                        <img src="{{ auditor.display_audit_signed.url }}" 
+                                                             alt="Аудит {{ auditor.full_name }}" 
+                                                             class="img-fluid border"
+                                                             style="max-height: 400px; cursor: pointer;">
+                                                    </a>
+                                                    <div class="mt-2">
+                                                        <a href="{{ auditor.display_audit_signed.url }}" 
+                                                           download 
+                                                           class="btn btn-sm btn-outline-info">
+                                                            <i class="fas fa-download"></i> Скачать
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Старые файлы (если есть) -->
+                        {% if certificate.file1 or certificate.file2 or certificate.file3 %}
                         <div class="row mb-3">
-                            <div class="col-md-4 fw-bold">Файлы:</div>
+                            <div class="col-md-4 fw-bold">Дополнительные файлы:</div>
                             <div class="col-md-8">
                                 <div class="d-flex flex-column gap-2">
                                     {% if certificate.file1 %}
-                                        <a href="{% url 'download_file' certificate.id 1 %}" class="btn btn-outline-primary">
-                                            <i class="fas fa-download"></i> Скачать сертификат
+                                        <a href="{% url 'download_file' certificate.id 1 %}" class="btn btn-outline-secondary btn-sm">
+                                            <i class="fas fa-download"></i> Скачать файл сертификата
                                         </a>
                                     {% endif %}
                                     {% if certificate.file2 %}
-                                        <a href="{% url 'download_file' certificate.id 2 %}" class="btn btn-outline-primary">
-                                            <i class="fas fa-download"></i> Скачать приложение
+                                        <a href="{% url 'download_file' certificate.id 2 %}" class="btn btn-outline-secondary btn-sm">
+                                            <i class="fas fa-download"></i> Скачать файл приложения
                                         </a>
                                     {% endif %}
                                     {% if certificate.file3 %}
-                                        <a href="{% url 'download_file' certificate.id 3 %}" class="btn btn-outline-primary">
+                                        <a href="{% url 'download_file' certificate.id 3 %}" class="btn btn-outline-secondary btn-sm">
                                             <i class="fas fa-download"></i> Скачать дополнительные материалы
                                         </a>
                                     {% endif %}
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>

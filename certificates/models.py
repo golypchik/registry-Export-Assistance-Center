@@ -6,7 +6,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.functional import cached_property
-from django.db.models.signals import pre_delete
+from django.db.models.signals import pre_delete, post_save
 from django.dispatch import receiver
 from dateutil.relativedelta import relativedelta
 from .utils import compress_image
@@ -76,17 +76,13 @@ class Certificate(models.Model):
                                                default='pending')
     
     file1 = models.FileField('Файл сертификата', upload_to='certificates/', null=True, blank=True)
-    file1_psd = models.FileField(upload_to='certificates/', blank=True, null=True, verbose_name="Сертификат (PSD)")
     file2 = models.FileField('Файл приложения', upload_to='certificates/', null=True, blank=True)
-    file2_psd = models.FileField(upload_to='permissions/', null=True, blank=True, verbose_name="Разрешение (PSD)")
-    file3 = models.FileField('Дополнительный файл', upload_to='certificates/', null=True, blank=True)
+    auditor_certificate = models.FileField('Сертификат аудитора', upload_to='certificates/', null=True, blank=True)
     
     # Удаляем дублирующиеся поля для очистки файлов - оставляем только clear_*
     clear_file1 = models.BooleanField(default=False)
-    clear_file1_psd = models.BooleanField(default=False)
     clear_file2 = models.BooleanField(default=False)
-    clear_file2_psd = models.BooleanField(default=False)
-    clear_file3 = models.BooleanField(default=False)
+    clear_auditor_certificate = models.BooleanField(default=False)
     
     created_at = models.DateTimeField('Дата создания', auto_now_add=True)
     updated_at = models.DateTimeField('Дата обновления', auto_now=True)
@@ -96,6 +92,18 @@ class Certificate(models.Model):
     notifications_enabled = models.BooleanField(default=False, verbose_name="Уведомления подключены")
     certification_area = models.TextField(verbose_name="Область сертификации")
     qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True, verbose_name='QR-код')
+    
+    # Автоматически генерируемые изображения сертификатов
+    generated_certificate = models.ImageField(upload_to='generated_certificates/', blank=True, null=True, verbose_name='Сертификат (без подписей)')
+    generated_certificate_signed = models.ImageField(upload_to='generated_certificates/', blank=True, null=True, verbose_name='Сертификат (с подписями)')
+    generated_permission = models.ImageField(upload_to='generated_permissions/', blank=True, null=True, verbose_name='Разрешение (без подписей)')
+    generated_permission_signed = models.ImageField(upload_to='generated_permissions/', blank=True, null=True, verbose_name='Разрешение (с подписями)')
+    
+    # Ручная загрузка сертификатов (заменяют автоматически сгенерированные)
+    uploaded_certificate = models.ImageField(upload_to='uploaded_certificates/', blank=True, null=True, verbose_name='Загруженный сертификат (без подписей)')
+    uploaded_certificate_signed = models.ImageField(upload_to='uploaded_certificates/', blank=True, null=True, verbose_name='Загруженный сертификат (с подписями)')
+    uploaded_permission = models.ImageField(upload_to='uploaded_permissions/', blank=True, null=True, verbose_name='Загруженное разрешение (без подписей)')
+    uploaded_permission_signed = models.ImageField(upload_to='uploaded_permissions/', blank=True, null=True, verbose_name='Загруженное разрешение (с подписями)')
 
     
     @cached_property
@@ -117,6 +125,40 @@ class Certificate(models.Model):
     def inn_display(self):
         """Для обратной совместимости - возвращает значение идентификатора"""
         return self.display_identifier
+    
+    def get_certificate_image(self, with_signatures=False):
+        """Возвращает изображение сертификата с приоритетом: uploaded > generated"""
+        if with_signatures:
+            return self.uploaded_certificate_signed or self.generated_certificate_signed
+        else:
+            return self.uploaded_certificate or self.generated_certificate
+    
+    def get_permission_image(self, with_signatures=False):
+        """Возвращает изображение разрешения с приоритетом: uploaded > generated"""
+        if with_signatures:
+            return self.uploaded_permission_signed or self.generated_permission_signed
+        else:
+            return self.uploaded_permission or self.generated_permission
+    
+    @property
+    def display_certificate_signed(self):
+        """Для использования в шаблонах - сертификат с подписями с приоритетом"""
+        return self.get_certificate_image(with_signatures=True)
+    
+    @property
+    def display_certificate(self):
+        """Для использования в шаблонах - сертификат без подписей с приоритетом"""
+        return self.get_certificate_image(with_signatures=False)
+    
+    @property
+    def display_permission_signed(self):
+        """Для использования в шаблонах - разрешение с подписями с приоритетом"""
+        return self.get_permission_image(with_signatures=True)
+    
+    @property
+    def display_permission(self):
+        """Для использования в шаблонах - разрешение без подписей с приоритетом"""
+        return self.get_permission_image(with_signatures=False)
 
     def clean(self):
         super().clean()
@@ -175,30 +217,24 @@ class Certificate(models.Model):
             self.file1 = None
             self.clear_file1 = False
             
-        if self.clear_file1_psd:
-            self._delete_file_if_exists(self.file1_psd)
-            self.file1_psd = None
-            self.clear_file1_psd = False
-            
         if self.clear_file2:
             self._delete_file_if_exists(self.file2)
             self.file2 = None
             self.clear_file2 = False
             
-        if self.clear_file2_psd:
-            self._delete_file_if_exists(self.file2_psd)
-            self.file2_psd = None
-            self.clear_file2_psd = False
-            
-        if self.clear_file3:
-            self._delete_file_if_exists(self.file3)
-            self.file3 = None
-            self.clear_file3 = False
+        if self.clear_auditor_certificate:
+            self._delete_file_if_exists(self.auditor_certificate)
+            self.auditor_certificate = None
+            self.clear_auditor_certificate = False
     
     def _compress_images(self):
         """Сжимает изображения больше 1 МБ до приемлемого размера"""
         # Список полей с изображениями для сжатия
-        image_fields = ['file1', 'file1_psd', 'file2', 'file2_psd', 'file3', 'qr_code']
+        image_fields = ['file1', 'file2', 'auditor_certificate', 'qr_code',
+                        'generated_certificate', 'generated_certificate_signed',
+                        'generated_permission', 'generated_permission_signed',
+                        'uploaded_certificate', 'uploaded_certificate_signed',
+                        'uploaded_permission', 'uploaded_permission_signed']
         
         for field_name in image_fields:
             field = getattr(self, field_name, None)
@@ -272,14 +308,20 @@ class Certificate(models.Model):
             
             qr_img.putdata(new_data)
             
-            # Загружаем логотип
-            logo_path = os.path.join(settings.BASE_DIR, 'certificates', 'static', 'certificates', 'img', 'company_logo.png')
+            # Загружаем логотип Центра Содействия Экспорту
+            logo_path = os.path.join(settings.BASE_DIR, 'templates', 'background', 'logo2.png')
+            logger.info(f"Проверка логотипа для QR-кода: {logo_path}")
+            logger.info(f"Файл существует: {os.path.exists(logo_path)}")
+            
             if os.path.exists(logo_path):
+                logger.info("Начинаем добавление логотипа в QR-код")
                 logo = Image.open(logo_path)
+                logger.info(f"Логотип загружен, размер: {logo.size}, режим: {logo.mode}")
                 
                 # Вычисляем размер логотипа (увеличиваем до 1/3 от размера QR-кода)
                 qr_width, qr_height = qr_img.size
                 logo_size = min(qr_width, qr_height) // 3
+                logger.info(f"QR-код размер: {qr_width}x{qr_height}, размер логотипа: {logo_size}x{logo_size}")
                 
                 # Изменяем размер логотипа
                 logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
@@ -303,6 +345,9 @@ class Certificate(models.Model):
                 # Накладываем логотип на белый фон
                 logo_final_pos = (logo_bg_pos[0] + logo_pos[0], logo_bg_pos[1] + logo_pos[1])
                 qr_img.paste(logo, logo_final_pos, logo)
+                logger.info("Логотип успешно добавлен в QR-код")
+            else:
+                logger.warning(f"Файл логотипа не найден: {logo_path}")
             
             # Сохраняем QR-код
             buffer = BytesIO()
@@ -315,6 +360,7 @@ class Certificate(models.Model):
             return True
             
         except Exception as e:
+            logger.error(f"Ошибка при генерации QR-кода: {e}", exc_info=True)
             print(f"Ошибка при генерации QR-кода: {e}")
             return False
     
@@ -355,11 +401,21 @@ class Certificate(models.Model):
         """Удаление сертификата с очисткой всех связанных файлов"""
         # Удаление файлов сертификата
         self._delete_file_if_exists(self.file1)
-        self._delete_file_if_exists(self.file1_psd)
         self._delete_file_if_exists(self.file2)
-        self._delete_file_if_exists(self.file2_psd)
-        self._delete_file_if_exists(self.file3)
+        self._delete_file_if_exists(self.auditor_certificate)
         self._delete_file_if_exists(self.qr_code)
+        
+        # Удаление сгенерированных файлов
+        self._delete_file_if_exists(self.generated_certificate)
+        self._delete_file_if_exists(self.generated_certificate_signed)
+        self._delete_file_if_exists(self.generated_permission)
+        self._delete_file_if_exists(self.generated_permission_signed)
+        
+        # Удаление загруженных вручную файлов
+        self._delete_file_if_exists(self.uploaded_certificate)
+        self._delete_file_if_exists(self.uploaded_certificate_signed)
+        self._delete_file_if_exists(self.uploaded_permission)
+        self._delete_file_if_exists(self.uploaded_permission_signed)
         
 
         # Удаление файлов аудиторов
@@ -398,9 +454,16 @@ class Auditor(models.Model):
     certificate = models.ForeignKey(Certificate, on_delete=models.CASCADE, related_name='auditors')
     full_name = models.CharField(max_length=255, verbose_name="ФИО аудитора")
     audit_file = models.FileField(upload_to='audit_files/', null=True, blank=True, verbose_name="Файл аудита")
-    audit_file_psd = models.FileField(upload_to='audit_files/', null=True, blank=True, verbose_name="Файл аудита (PSD)")
     audit_number = models.CharField(max_length=20, blank=True, verbose_name="Номер аудита")
     generated_audit_image = models.ImageField(upload_to='audit_images/', blank=True, null=True, verbose_name="Сгенерированное изображение аудита")
+    
+    # Автоматически генерируемые изображения аудита
+    generated_audit = models.ImageField(upload_to='generated_audits/', blank=True, null=True, verbose_name='Аудит (без подписей)')
+    generated_audit_signed = models.ImageField(upload_to='generated_audits/', blank=True, null=True, verbose_name='Аудит (с подписями)')
+    
+    # Ручная загрузка сертификатов аудитора (заменяют автоматически сгенерированные)
+    uploaded_audit = models.ImageField(upload_to='uploaded_audits/', blank=True, null=True, verbose_name='Загруженный аудит (без подписей)')
+    uploaded_audit_signed = models.ImageField(upload_to='uploaded_audits/', blank=True, null=True, verbose_name='Загруженный аудит (с подписями)')
 
     def __str__(self):
         return f"{self.full_name} - {self.certificate.full_certificate_number}"
@@ -417,7 +480,9 @@ class Auditor(models.Model):
     def _compress_images(self):
         """Сжимает изображения больше 1 МБ до приемлемого размера"""
         # Список полей с изображениями для сжатия
-        image_fields = ['audit_file', 'audit_file_psd', 'generated_audit_image']
+        image_fields = ['audit_file', 'generated_audit_image',
+                        'generated_audit', 'generated_audit_signed',
+                        'uploaded_audit', 'uploaded_audit_signed']
         
         for field_name in image_fields:
             field = getattr(self, field_name, None)
@@ -461,11 +526,31 @@ class Auditor(models.Model):
         
         super().save(*args, **kwargs)
 
+    def get_audit_image(self, with_signatures=False):
+        """Возвращает изображение аудита с приоритетом: uploaded > generated"""
+        if with_signatures:
+            return self.uploaded_audit_signed or self.generated_audit_signed
+        else:
+            return self.uploaded_audit or self.generated_audit
+    
+    @property
+    def display_audit_signed(self):
+        """Для использования в шаблонах - аудит с подписями с приоритетом"""
+        return self.get_audit_image(with_signatures=True)
+    
+    @property
+    def display_audit(self):
+        """Для использования в шаблонах - аудит без подписей с приоритетом"""
+        return self.get_audit_image(with_signatures=False)
+
     def delete(self, *args, **kwargs):
         """Удаление аудитора с очисткой файлов"""
         self._delete_file_if_exists(self.audit_file)
-        self._delete_file_if_exists(self.audit_file_psd)
         self._delete_file_if_exists(self.generated_audit_image)
+        self._delete_file_if_exists(self.generated_audit)
+        self._delete_file_if_exists(self.generated_audit_signed)
+        self._delete_file_if_exists(self.uploaded_audit)
+        self._delete_file_if_exists(self.uploaded_audit_signed)
         super().delete(*args, **kwargs)
 
     class Meta:
@@ -487,4 +572,73 @@ def auditor_delete_files(sender, instance, **kwargs):
     """Сигнал для удаления файлов при удалении аудитора"""
     # Этот сигнал можно использовать как дополнительную защиту
     # если метод delete() по какой-то причине не сработает
-    pass    
+    pass
+
+
+@receiver(post_save, sender=Certificate)
+def generate_certificate_images(sender, instance, created, **kwargs):
+    """
+    Автоматически генерирует изображения сертификатов после сохранения
+    """
+    # Проверяем, что это не рекурсивный вызов
+    if kwargs.get('update_fields'):
+        # Если update_fields указаны, это скорее всего наш собственный вызов save()
+        # Проверяем, не обновляем ли мы только generated поля
+        update_fields = kwargs.get('update_fields', [])
+        if any(field.startswith('generated_') for field in update_fields):
+            return
+    
+    # Проверяем, есть ли QR-код (он генерируется первым)
+    if not instance.qr_code:
+        logger.info(f"QR-код еще не создан для сертификата {instance.id}, пропускаем генерацию")
+        return
+    
+    # Импортируем генератор здесь, чтобы избежать циклических импортов
+    from .certificate_generator import generate_all_certificates
+    
+    try:
+        logger.info(f"Запуск генерации сертификатов для {instance.name} (ID: {instance.id})")
+        generate_all_certificates(instance)
+    except Exception as e:
+        logger.error(f"Ошибка при автоматической генерации сертификатов: {e}", exc_info=True)
+
+
+@receiver(post_save, sender=Auditor)
+def generate_auditor_images(sender, instance, created, **kwargs):
+    """
+    Автоматически генерирует изображения аудита после сохранения аудитора
+    """
+    # Проверяем, что это не рекурсивный вызов
+    if kwargs.get('update_fields'):
+        update_fields = kwargs.get('update_fields', [])
+        if any(field.startswith('generated_') for field in update_fields):
+            return
+    
+    # Проверяем, есть ли QR-код у сертификата
+    if not instance.certificate.qr_code:
+        logger.info(f"QR-код еще не создан для сертификата, пропускаем генерацию аудита")
+        return
+    
+    # Импортируем генератор
+    from .certificate_generator import generate_audit_certificate
+    
+    try:
+        logger.info(f"Запуск генерации аудита для {instance.full_name}")
+        
+        # Генерируем аудит без подписей
+        audit_file = generate_audit_certificate(instance.certificate, instance, with_signatures=False)
+        if audit_file:
+            filename = f'audit_{instance.id}.png'
+            instance.generated_audit.save(filename, audit_file, save=False)
+        
+        # Генерируем аудит с подписями
+        audit_signed_file = generate_audit_certificate(instance.certificate, instance, with_signatures=True)
+        if audit_signed_file:
+            filename = f'audit_{instance.id}_signed.png'
+            instance.generated_audit_signed.save(filename, audit_signed_file, save=False)
+        
+        # Сохраняем с указанием update_fields чтобы избежать рекурсии
+        instance.save(update_fields=['generated_audit', 'generated_audit_signed'])
+        
+    except Exception as e:
+        logger.error(f"Ошибка при автоматической генерации аудита: {e}", exc_info=True)    
