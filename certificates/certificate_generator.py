@@ -30,22 +30,55 @@ def format_date(date_obj):
 
 
 def get_font(size, bold=False):
-    """Получает шрифт Times New Roman"""
-    try:
-        if bold:
-            return ImageFont.truetype("timesbd.ttf", size)
-        else:
-            return ImageFont.truetype("times.ttf", size)
-    except:
-        # Попробуем альтернативные пути
+    """Получает шрифт Times New Roman или его аналог"""
+    # Список путей к шрифтам для поиска (в порядке приоритета)
+    font_paths = []
+    
+    if bold:
+        font_paths = [
+            # Пользовательские шрифты в проекте
+            os.path.join(settings.BASE_DIR, 'static', 'fonts', 'LiberationSerif-Bold.ttf'),
+            os.path.join(settings.BASE_DIR, 'static', 'fonts', 'timesbd.ttf'),
+            # Windows
+            "C:/Windows/Fonts/timesbd.ttf",
+            "timesbd.ttf",
+            # Linux системные шрифты
+            "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation2/LiberationSerif-Bold.ttf",
+        ]
+    else:
+        font_paths = [
+            # Пользовательские шрифты в проекте
+            os.path.join(settings.BASE_DIR, 'static', 'fonts', 'LiberationSerif-Regular.ttf'),
+            os.path.join(settings.BASE_DIR, 'static', 'fonts', 'times.ttf'),
+            # Windows
+            "C:/Windows/Fonts/times.ttf",
+            "times.ttf",
+            # Linux системные шрифты
+            "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+            "/usr/share/fonts/truetype/liberation2/LiberationSerif-Regular.ttf",
+        ]
+    
+    # Пробуем загрузить шрифты по очереди
+    for font_path in font_paths:
         try:
-            if bold:
-                return ImageFont.truetype("C:/Windows/Fonts/timesbd.ttf", size)
-            else:
-                return ImageFont.truetype("C:/Windows/Fonts/times.ttf", size)
-        except:
-            logger.warning("Не найден шрифт Times New Roman. Используется шрифт по умолчанию.")
-            return ImageFont.load_default()
+            font = ImageFont.truetype(font_path, size)
+            logger.info(f"Успешно загружен шрифт: {font_path}")
+            return font
+        except Exception:
+            continue
+    
+    # Если ничего не найдено, логируем ошибку
+    logger.error(f"КРИТИЧНО: Не найден ни один подходящий шрифт! Размер: {size}, Bold: {bold}")
+    logger.error("Пожалуйста, установите Liberation Serif или Times New Roman")
+    logger.error("Для Linux: установите пакет fonts-liberation")
+    logger.error("Для Windows: запустите copy_fonts_windows.bat")
+    
+    # Последняя надежда - дефолтный шрифт PIL (очень маленький и некрасивый)
+    logger.warning("Используется дефолтный шрифт PIL - качество будет низким!")
+    return ImageFont.load_default()
 
 
 def draw_text_in_box(draw, text, x, y, width, height, font, color, align='center', valign='top'):

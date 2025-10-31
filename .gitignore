@@ -132,6 +132,11 @@ static_collected/
 # Allow app-specific static files
 !certificates/static/
 
+# Fonts (downloaded during build)
+static/fonts/*.ttf
+static/fonts/*.otf
+!static/fonts/README.md
+
 # IDE files
 .vscode/
 .idea/

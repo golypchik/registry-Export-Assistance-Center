@@ -4,6 +4,28 @@ set -o errexit
 
 echo "Starting build process..."
 
+# Download Liberation Serif fonts for certificate generation
+echo "Setting up fonts for certificate generation..."
+mkdir -p static/fonts
+
+if [ ! -f "static/fonts/LiberationSerif-Regular.ttf" ]; then
+    echo "Downloading Liberation Serif fonts..."
+    # Скачиваем шрифты напрямую из GitHub releases
+    wget -q https://github.com/liberationfonts/liberation-fonts/files/7261482/liberation-fonts-ttf-2.1.5.tar.gz -O /tmp/liberation-fonts.tar.gz
+    
+    if [ -f "/tmp/liberation-fonts.tar.gz" ]; then
+        tar -xzf /tmp/liberation-fonts.tar.gz -C /tmp/
+        cp /tmp/liberation-fonts-ttf-2.1.5/LiberationSerif-Regular.ttf static/fonts/ 2>/dev/null || true
+        cp /tmp/liberation-fonts-ttf-2.1.5/LiberationSerif-Bold.ttf static/fonts/ 2>/dev/null || true
+        rm -rf /tmp/liberation-fonts*
+        echo "✓ Liberation Serif fonts installed"
+    else
+        echo "⚠ Could not download fonts, will use system fonts"
+    fi
+else
+    echo "✓ Fonts already present"
+fi
+
 # Install dependencies
 echo "Installing Python dependencies..."
 pip install -r requirements.txt
