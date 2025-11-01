@@ -297,8 +297,12 @@ def generate_audit_certificate(certificate, auditor, with_signatures=False):
                 bg.paste(ruk, (1709, 3087), ruk if ruk.mode == 'RGBA' else None)
         
         # Сохраняем результат в BytesIO
+        # Используем JPEG вместо PNG для более быстрой и надежной обработки
         buffer = BytesIO()
-        bg.save(buffer, format='PNG')
+        # Конвертируем в RGB если нужно (JPEG не поддерживает RGBA)
+        if bg.mode == 'RGBA':
+            bg = bg.convert('RGB')
+        bg.save(buffer, format='JPEG', quality=95, optimize=False)
         buffer.seek(0)
         
         logger.info(f"Аудит сгенерирован для {auditor.full_name} {'с подписями' if with_signatures else 'без подписей'}")
@@ -399,8 +403,12 @@ def generate_main_certificate(certificate, with_signatures=False):
                 bg.paste(ruk, (1709, 3087), ruk if ruk.mode == 'RGBA' else None)
         
         # Сохраняем результат в BytesIO
+        # Используем JPEG вместо PNG для более быстрой и надежной обработки
         buffer = BytesIO()
-        bg.save(buffer, format='PNG')
+        # Конвертируем в RGB если нужно (JPEG не поддерживает RGBA)
+        if bg.mode == 'RGBA':
+            bg = bg.convert('RGB')
+        bg.save(buffer, format='JPEG', quality=95, optimize=False)
         buffer.seek(0)
         
         logger.info(f"Сертификат сгенерирован для {certificate.name} {'с подписями' if with_signatures else 'без подписей'}")
@@ -471,8 +479,12 @@ def generate_permission_certificate(certificate, with_signatures=False):
                 bg.paste(per, (1705, 2930), per if per.mode == 'RGBA' else None)
         
         # Сохраняем результат в BytesIO
+        # Используем JPEG вместо PNG для более быстрой и надежной обработки
         buffer = BytesIO()
-        bg.save(buffer, format='PNG')
+        # Конвертируем в RGB если нужно (JPEG не поддерживает RGBA)
+        if bg.mode == 'RGBA':
+            bg = bg.convert('RGB')
+        bg.save(buffer, format='JPEG', quality=95, optimize=False)
         buffer.seek(0)
         
         logger.info(f"Разрешение сгенерировано для {certificate.name} {'с подписями' if with_signatures else 'без подписей'}")
@@ -498,7 +510,7 @@ def generate_all_certificates(certificate):
     if not certificate.uploaded_certificate:
         cert_file = generate_main_certificate(certificate, with_signatures=False)
         if cert_file:
-            filename = f'certificate_{certificate.id}.png'
+            filename = f'certificate_{certificate.id}.jpg'
             certificate.generated_certificate.save(filename, cert_file, save=False)
             logger.info(f"Сохранен сертификат без подписей: {filename}")
         else:
@@ -510,7 +522,7 @@ def generate_all_certificates(certificate):
     if not certificate.uploaded_certificate_signed:
         cert_signed_file = generate_main_certificate(certificate, with_signatures=True)
         if cert_signed_file:
-            filename = f'certificate_{certificate.id}_signed.png'
+            filename = f'certificate_{certificate.id}_signed.jpg'
             certificate.generated_certificate_signed.save(filename, cert_signed_file, save=False)
             logger.info(f"Сохранен сертификат с подписями: {filename}")
         else:
@@ -522,7 +534,7 @@ def generate_all_certificates(certificate):
     if not certificate.uploaded_permission:
         perm_file = generate_permission_certificate(certificate, with_signatures=False)
         if perm_file:
-            filename = f'permission_{certificate.id}.png'
+            filename = f'permission_{certificate.id}.jpg'
             certificate.generated_permission.save(filename, perm_file, save=False)
             logger.info(f"Сохранено разрешение без подписей: {filename}")
         else:
@@ -534,7 +546,7 @@ def generate_all_certificates(certificate):
     if not certificate.uploaded_permission_signed:
         perm_signed_file = generate_permission_certificate(certificate, with_signatures=True)
         if perm_signed_file:
-            filename = f'permission_{certificate.id}_signed.png'
+            filename = f'permission_{certificate.id}_signed.jpg'
             certificate.generated_permission_signed.save(filename, perm_signed_file, save=False)
             logger.info(f"Сохранено разрешение с подписями: {filename}")
         else:
@@ -548,7 +560,7 @@ def generate_all_certificates(certificate):
         if not auditor.uploaded_audit:
             audit_file = generate_audit_certificate(certificate, auditor, with_signatures=False)
             if audit_file:
-                filename = f'audit_{auditor.id}.png'
+                filename = f'audit_{auditor.id}.jpg'
                 auditor.generated_audit.save(filename, audit_file, save=False)
                 auditor.save(update_fields=['generated_audit'])
                 logger.info(f"Сохранен аудит без подписей для {auditor.full_name}: {filename}")
@@ -559,7 +571,7 @@ def generate_all_certificates(certificate):
         if not auditor.uploaded_audit_signed:
             audit_signed_file = generate_audit_certificate(certificate, auditor, with_signatures=True)
             if audit_signed_file:
-                filename = f'audit_{auditor.id}_signed.png'
+                filename = f'audit_{auditor.id}_signed.jpg'
                 auditor.generated_audit_signed.save(filename, audit_signed_file, save=False)
                 auditor.save(update_fields=['generated_audit_signed'])
                 logger.info(f"Сохранен аудит с подписями для {auditor.full_name}: {filename}")

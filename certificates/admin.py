@@ -98,6 +98,12 @@ class CertificateAdmin(admin.ModelAdmin):
             'fields': ('qr_code_actions',),
             'description': 'QR-код автоматически создается при сохранении сертификата'
         }),
+        ('⚠️ Важно: Регенерация сертификатов', {
+            'fields': (),
+            'description': '<strong style="color: #d63301;">Сертификаты НЕ регенерируются автоматически при сохранении для предотвращения таймаутов.</strong><br>'
+                          'Используйте кнопки "Регенерировать сертификаты" ниже или action "Регенерировать сертификаты" в списке сертификатов.<br>'
+                          '<em>Сертификаты будут автоматически регенерированы только при изменении ISO стандартов.</em>'
+        }),
         ('Файлы', {
             'fields': (
                 'permissions_preview',
@@ -142,9 +148,9 @@ class CertificateAdmin(admin.ModelAdmin):
             del request.session['duplicate_certificate_data']
             logger.info("Данные дублирования очищены из сессии")
         
-        # Перегенерируем сертификаты при каждом сохранении (только автогенерируемые)
-        # Помечаем, что нужна регенерация после сохранения всех formset
-        request._regenerate_certificates = True
+        # НЕ регенерируем автоматически - это вызывает таймаут на продакшене
+        # Пользователь может использовать кнопку "Регенерировать сертификаты"
+        # request._regenerate_certificates = True
 
     def save_formset(self, request, form, formset, change):
         """Сохранение формсетов (аудиторы и ISO стандарты)"""
