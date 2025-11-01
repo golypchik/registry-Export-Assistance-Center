@@ -372,11 +372,10 @@ def generate_main_certificate(certificate, with_signatures=False):
             qr = qr.resize(new_size, Image.Resampling.LANCZOS)
             bg.paste(qr, (2053, 756), qr if qr.mode == 'RGBA' else None)
         
-        # 10. Система менеджмента подтверждает
+        # 10. Текст того, что удостоверяет сертификат
         font = get_font(43, bold=False)
         color = hex_to_rgb('000000')
-        qms_text = f"Система менеджмента подтверждает {certificate.quality_management_system}"
-        draw_text_in_box(draw, qms_text, 340, 1900, 2012, 350, 
+        draw_text_in_box(draw, certificate.quality_management_system, 340, 1900, 2012, 350, 
                          font, color, align='center', valign='center')
         
         # Добавляем подписи и печать, если требуется
@@ -490,66 +489,82 @@ def generate_all_certificates(certificate):
     - Основной сертификат (с подписями и без)
     - Разрешение (с подписями и без)
     - Аудит для каждого аудитора (с подписями и без)
+    
+    НЕ перезаписывает uploaded файлы (загруженные пользователем вручную)
     """
     logger.info(f"Начало генерации сертификатов для {certificate.name} (ID: {certificate.id})")
     
-    # 1. Генерируем основной сертификат без подписей
-    cert_file = generate_main_certificate(certificate, with_signatures=False)
-    if cert_file:
-        filename = f'certificate_{certificate.id}.png'
-        certificate.generated_certificate.save(filename, cert_file, save=False)
-        logger.info(f"Сохранен сертификат без подписей: {filename}")
-        logger.info(f"Путь к файлу: {certificate.generated_certificate.name}")
+    # 1. Генерируем основной сертификат без подписей (только если нет uploaded версии)
+    if not certificate.uploaded_certificate:
+        cert_file = generate_main_certificate(certificate, with_signatures=False)
+        if cert_file:
+            filename = f'certificate_{certificate.id}.png'
+            certificate.generated_certificate.save(filename, cert_file, save=False)
+            logger.info(f"Сохранен сертификат без подписей: {filename}")
+        else:
+            logger.error("Не удалось сгенерировать сертификат без подписей")
     else:
-        logger.error("Не удалось сгенерировать сертификат без подписей")
+        logger.info(f"Пропуск генерации сертификата без подписей - используется uploaded версия")
     
-    # 2. Генерируем основной сертификат с подписями
-    cert_signed_file = generate_main_certificate(certificate, with_signatures=True)
-    if cert_signed_file:
-        filename = f'certificate_{certificate.id}_signed.png'
-        certificate.generated_certificate_signed.save(filename, cert_signed_file, save=False)
-        logger.info(f"Сохранен сертификат с подписями: {filename}")
-        logger.info(f"Путь к файлу: {certificate.generated_certificate_signed.name}")
+    # 2. Генерируем основной сертификат с подписями (только если нет uploaded версии)
+    if not certificate.uploaded_certificate_signed:
+        cert_signed_file = generate_main_certificate(certificate, with_signatures=True)
+        if cert_signed_file:
+            filename = f'certificate_{certificate.id}_signed.png'
+            certificate.generated_certificate_signed.save(filename, cert_signed_file, save=False)
+            logger.info(f"Сохранен сертификат с подписями: {filename}")
+        else:
+            logger.error("Не удалось сгенерировать сертификат с подписями")
     else:
-        logger.error("Не удалось сгенерировать сертификат с подписями")
+        logger.info(f"Пропуск генерации сертификата с подписями - используется uploaded версия")
     
-    # 3. Генерируем разрешение без подписей
-    perm_file = generate_permission_certificate(certificate, with_signatures=False)
-    if perm_file:
-        filename = f'permission_{certificate.id}.png'
-        certificate.generated_permission.save(filename, perm_file, save=False)
-        logger.info(f"Сохранено разрешение без подписей: {filename}")
-        logger.info(f"Путь к файлу: {certificate.generated_permission.name}")
+    # 3. Генерируем разрешение без подписей (только если нет uploaded версии)
+    if not certificate.uploaded_permission:
+        perm_file = generate_permission_certificate(certificate, with_signatures=False)
+        if perm_file:
+            filename = f'permission_{certificate.id}.png'
+            certificate.generated_permission.save(filename, perm_file, save=False)
+            logger.info(f"Сохранено разрешение без подписей: {filename}")
+        else:
+            logger.error("Не удалось сгенерировать разрешение без подписей")
     else:
-        logger.error("Не удалось сгенерировать разрешение без подписей")
+        logger.info(f"Пропуск генерации разрешения без подписей - используется uploaded версия")
     
-    # 4. Генерируем разрешение с подписями
-    perm_signed_file = generate_permission_certificate(certificate, with_signatures=True)
-    if perm_signed_file:
-        filename = f'permission_{certificate.id}_signed.png'
-        certificate.generated_permission_signed.save(filename, perm_signed_file, save=False)
-        logger.info(f"Сохранено разрешение с подписями: {filename}")
-        logger.info(f"Путь к файлу: {certificate.generated_permission_signed.name}")
+    # 4. Генерируем разрешение с подписями (только если нет uploaded версии)
+    if not certificate.uploaded_permission_signed:
+        perm_signed_file = generate_permission_certificate(certificate, with_signatures=True)
+        if perm_signed_file:
+            filename = f'permission_{certificate.id}_signed.png'
+            certificate.generated_permission_signed.save(filename, perm_signed_file, save=False)
+            logger.info(f"Сохранено разрешение с подписями: {filename}")
+        else:
+            logger.error("Не удалось сгенерировать разрешение с подписями")
     else:
-        logger.error("Не удалось сгенерировать разрешение с подписями")
+        logger.info(f"Пропуск генерации разрешения с подписями - используется uploaded версия")
     
-    # 5. Генерируем аудиты для каждого аудитора
+    # 5. Генерируем аудиты для каждого аудитора (только если нет uploaded версий)
     for auditor in certificate.auditors.all():
-        # Аудит без подписей
-        audit_file = generate_audit_certificate(certificate, auditor, with_signatures=False)
-        if audit_file:
-            filename = f'audit_{auditor.id}.png'
-            auditor.generated_audit.save(filename, audit_file, save=False)
-            auditor.save(update_fields=['generated_audit'])
-            logger.info(f"Сохранен аудит без подписей для {auditor.full_name}: {filename}")
+        # Аудит без подписей (только если нет uploaded версии)
+        if not auditor.uploaded_audit:
+            audit_file = generate_audit_certificate(certificate, auditor, with_signatures=False)
+            if audit_file:
+                filename = f'audit_{auditor.id}.png'
+                auditor.generated_audit.save(filename, audit_file, save=False)
+                auditor.save(update_fields=['generated_audit'])
+                logger.info(f"Сохранен аудит без подписей для {auditor.full_name}: {filename}")
+        else:
+            logger.info(f"Пропуск генерации аудита без подписей для {auditor.full_name} - используется uploaded версия")
         
-        # Аудит с подписями
-        audit_signed_file = generate_audit_certificate(certificate, auditor, with_signatures=True)
-        if audit_signed_file:
-            filename = f'audit_{auditor.id}_signed.png'
-            auditor.generated_audit_signed.save(filename, audit_signed_file, save=False)
-            auditor.save(update_fields=['generated_audit_signed'])
-            logger.info(f"Сохранен аудит с подписями для {auditor.full_name}: {filename}")
+        # Аудит с подписями (только если нет uploaded версии)
+        if not auditor.uploaded_audit_signed:
+            audit_signed_file = generate_audit_certificate(certificate, auditor, with_signatures=True)
+            if audit_signed_file:
+                filename = f'audit_{auditor.id}_signed.png'
+                auditor.generated_audit_signed.save(filename, audit_signed_file, save=False)
+                auditor.save(update_fields=['generated_audit_signed'])
+                logger.info(f"Сохранен аудит с подписями для {auditor.full_name}: {filename}")
+        else:
+            logger.info(f"Пропуск генерации аудита с подписями для {auditor.full_name} - используется uploaded версия")
     
     # Проверяем что поля установлены перед сохранением
     logger.info(f"Проверка полей перед сохранением:")

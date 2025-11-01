@@ -62,6 +62,7 @@ class CertificateAdmin(admin.ModelAdmin):
     list_filter = ('status', 'identifier_type', 'first_inspection_status', 'second_inspection_status', 'notifications_enabled')
     search_fields = ('name', 'certificate_number_part', 'identifier_value', 'inn')
     date_hierarchy = 'created_at'
+    actions = ['duplicate_certificates', 'regenerate_all_certificates', 'regenerate_qr_codes_action']
     
     def display_identifier_info(self, obj):
         return f"{obj.display_identifier_label}: {obj.display_identifier}"
@@ -93,6 +94,10 @@ class CertificateAdmin(admin.ModelAdmin):
             'fields': ('first_inspection_date', 'first_inspection_status',
                       'second_inspection_date', 'second_inspection_status')
         }),
+        ('QR-код', {
+            'fields': ('qr_code_actions',),
+            'description': 'QR-код автоматически создается при сохранении сертификата'
+        }),
         ('Файлы', {
             'fields': (
                 'permissions_preview',
@@ -101,7 +106,6 @@ class CertificateAdmin(admin.ModelAdmin):
                 'certificates_preview',
                 'uploaded_certificate',
                 'uploaded_certificate_signed',
-                'qr_code',
                 'auditors_certificates_preview',
             )
         }),
@@ -110,7 +114,7 @@ class CertificateAdmin(admin.ModelAdmin):
         }),
     )
     
-    readonly_fields = ('permissions_preview', 'certificates_preview', 
+    readonly_fields = ('qr_code_actions', 'permissions_preview', 'certificates_preview', 
                        'auditors_certificates_preview', 'qr_code')
 
     def save_model(self, request, obj, form, change):
@@ -137,6 +141,10 @@ class CertificateAdmin(admin.ModelAdmin):
         if 'duplicate_certificate_data' in request.session:
             del request.session['duplicate_certificate_data']
             logger.info("Данные дублирования очищены из сессии")
+        
+        # Перегенерируем сертификаты при каждом сохранении (только автогенерируемые)
+        # Помечаем, что нужна регенерация после сохранения всех formset
+        request._regenerate_certificates = True
 
     def save_formset(self, request, form, formset, change):
         """Сохранение формсетов (аудиторы и ISO стандарты)"""
@@ -169,11 +177,16 @@ class CertificateAdmin(admin.ModelAdmin):
         
         formset.save_m2m()
         
-        # Если изменились ISO стандарты - регенерируем сертификаты
-        if iso_standards_changed and form.instance.qr_code:
+        # Регенерируем сертификаты если нужно (при каждом сохранении или при изменении ISO стандартов)
+        should_regenerate = (
+            getattr(request, '_regenerate_certificates', False) or 
+            iso_standards_changed
+        )
+        
+        if should_regenerate and form.instance.qr_code:
             from .certificate_generator import generate_all_certificates
             try:
-                logger.info(f"ISO стандарты изменены через админку для {form.instance.name}, запуск генерации")
+                logger.info(f"Регенерация сертификатов для {form.instance.name}")
                 generate_all_certificates(form.instance)
             except Exception as e:
                 logger.error(f"Ошибка при генерации сертификатов: {e}", exc_info=True)
@@ -188,6 +201,51 @@ class CertificateAdmin(admin.ModelAdmin):
         return HttpResponseRedirect(f'/admin/certificates/certificate/add/?duplicate_from={certificate.id}')
     
     duplicate_certificates.short_description = "Дублировать сертификат"
+    
+    def regenerate_qr_codes_action(self, request, queryset):
+        """Массовая регенерация QR-кодов для выбранных сертификатов"""
+        from .utils import create_qr_code
+        
+        success_count = 0
+        error_count = 0
+        
+        for certificate in queryset:
+            try:
+                # Генерируем новый QR-код
+                qr_code_file = create_qr_code(
+                    certificate.verification_url,
+                    certificate_id=certificate.id
+                )
+                
+                if qr_code_file:
+                    # Сохраняем QR-код
+                    filename = f'qr_code_{certificate.id}.png'
+                    certificate.qr_code.save(filename, qr_code_file, save=True)
+                    success_count += 1
+                    logger.info(f"QR-код регенерирован для {certificate.name}")
+                else:
+                    error_count += 1
+                    logger.error(f"Не удалось создать QR-код для {certificate.name}")
+                    
+            except Exception as e:
+                error_count += 1
+                logger.error(f"Ошибка при регенерации QR-кода для {certificate.name}: {e}", exc_info=True)
+        
+        # Сообщение об успехе/ошибках
+        if success_count > 0:
+            self.message_user(
+                request, 
+                f"✅ Успешно регенерировано QR-кодов: {success_count}", 
+                level='success'
+            )
+        if error_count > 0:
+            self.message_user(
+                request, 
+                f"❌ Ошибок при регенерации: {error_count}", 
+                level='warning'
+            )
+    
+    regenerate_qr_codes_action.short_description = "🔄 Регенерировать QR-коды"
 
     
     def get_urls(self):
@@ -434,8 +492,9 @@ class CertificateAdmin(admin.ModelAdmin):
             return format_html(
                 '<div style="text-align: center;">'
                 '<img src="{}" style="max-width:100px; max-height:100px; border: 1px solid #ddd; border-radius: 4px;" /><br>'
-                '<small>QR-код с логотипом</small><br>'
-                '<a href="javascript:void(0)" onclick="regenerateQR({})" style="font-size: 11px; color: #007cba;">Перегенерировать</a>'
+                '<small style="color: #666;">QR-код с логотипом</small><br>'
+                '<a href="{}" target="_blank" style="display: inline-block; margin: 5px; padding: 4px 8px; background: #0073aa; color: white; text-decoration: none; border-radius: 3px; font-size: 11px;">📥 Скачать</a>'
+                '<button onclick="regenerateQR({}); return false;" style="margin: 5px; padding: 4px 8px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">🔄 Перегенерировать</button>'
                 '</div>'
                 '<script>'
                 'function regenerateQR(certId) {{'
@@ -448,6 +507,7 @@ class CertificateAdmin(admin.ModelAdmin):
                 '            }}'
                 '        }}).then(response => {{'
                 '            if(response.ok) {{'
+                '                alert("QR-код успешно перегенерирован!");'
                 '                location.reload();'
                 '            }} else {{'
                 '                alert("Ошибка при генерации QR-кода");'
@@ -456,12 +516,12 @@ class CertificateAdmin(admin.ModelAdmin):
                 '    }}'
                 '}}'
                 '</script>', 
-                obj.qr_code.url, obj.pk
+                obj.qr_code.url, obj.qr_code.url, obj.pk
             )
         return format_html(
             '<div style="text-align: center; color: #666;">'
             'QR-код не сгенерирован<br>'
-            '<a href="javascript:void(0)" onclick="regenerateQR({})" style="font-size: 11px; color: #007cba;">Сгенерировать</a>'
+            '<button onclick="regenerateQR({}); return false;" style="margin: 5px; padding: 4px 8px; background: #0073aa; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">✨ Сгенерировать QR-код</button>'
             '</div>'
             '<script>'
             'function regenerateQR(certId) {{'
@@ -473,6 +533,7 @@ class CertificateAdmin(admin.ModelAdmin):
             '        }}'
             '    }}).then(response => {{'
             '        if(response.ok) {{'
+            '            alert("QR-код успешно сгенерирован!");'
             '            location.reload();'
             '        }} else {{'
             '            alert("Ошибка при генерации QR-кода");'
@@ -484,6 +545,89 @@ class CertificateAdmin(admin.ModelAdmin):
         )
     qr_code.short_description = 'QR-код'
 
+    def qr_code_actions(self, obj):
+        """Кнопки управления QR-кодом"""
+        if not obj.pk:
+            return "Сохраните сертификат для создания QR-кода"
+        
+        if obj.qr_code:
+            return format_html(
+                '<div style="padding: 15px; background: #f0f8ff; border: 2px solid #0073aa; border-radius: 8px; text-align: center;">'
+                '<h4 style="margin: 0 0 10px 0; color: #0073aa;">🔲 QR-код сертификата</h4>'
+                '<img src="{}" style="max-width:120px; max-height:120px; border: 2px solid #0073aa; border-radius: 8px; margin: 10px 0;" /><br>'
+                '<div style="margin-top: 10px;">'
+                '<a href="{}" target="_blank" style="display: inline-block; margin: 5px; padding: 8px 16px; background: #0073aa; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">📥 Скачать QR-код</a>'
+                '<button onclick="regenerateQRCode({}); return false;" style="margin: 5px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">🔄 Перегенерировать QR-код</button>'
+                '</div>'
+                '</div>'
+                '<script>'
+                'function regenerateQRCode(certId) {{'
+                '    if(confirm("Вы уверены? Старый QR-код будет заменен новым.")) {{'
+                '        const btn = event.target;'
+                '        btn.disabled = true;'
+                '        btn.textContent = "⏳ Генерация...";'
+                '        fetch("/admin/certificates/certificate/" + certId + "/regenerate-qr/", {{'
+                '            method: "POST",'
+                '            headers: {{'
+                '                "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,'
+                '                "Content-Type": "application/json"'
+                '            }}'
+                '        }}).then(response => {{'
+                '            if(response.ok) {{'
+                '                alert("✅ QR-код успешно перегенерирован!");'
+                '                location.reload();'
+                '            }} else {{'
+                '                alert("❌ Ошибка при генерации QR-кода");'
+                '                btn.disabled = false;'
+                '                btn.textContent = "🔄 Перегенерировать QR-код";'
+                '            }}'
+                '        }}).catch(err => {{'
+                '            alert("❌ Ошибка: " + err);'
+                '            btn.disabled = false;'
+                '            btn.textContent = "🔄 Перегенерировать QR-код";'
+                '        }});'
+                '    }}'
+                '}}'
+                '</script>', 
+                obj.qr_code.url, obj.qr_code.url, obj.pk
+            )
+        else:
+            return format_html(
+                '<div style="padding: 15px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; text-align: center;">'
+                '<h4 style="margin: 0 0 10px 0; color: #856404;">⚠ QR-код не сгенерирован</h4>'
+                '<button onclick="regenerateQRCode({}); return false;" style="margin: 5px; padding: 8px 16px; background: #0073aa; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">✨ Создать QR-код</button>'
+                '</div>'
+                '<script>'
+                'function regenerateQRCode(certId) {{'
+                '    const btn = event.target;'
+                '    btn.disabled = true;'
+                '    btn.textContent = "⏳ Генерация...";'
+                '    fetch("/admin/certificates/certificate/" + certId + "/regenerate-qr/", {{'
+                '        method: "POST",'
+                '        headers: {{'
+                '            "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,'
+                '            "Content-Type": "application/json"'
+                '        }}'
+                '    }}).then(response => {{'
+                '        if(response.ok) {{'
+                '            alert("✅ QR-код успешно создан!");'
+                '            location.reload();'
+                '        }} else {{'
+                '            alert("❌ Ошибка при создании QR-кода");'
+                '            btn.disabled = false;'
+                '            btn.textContent = "✨ Создать QR-код";'
+                '        }}'
+                '    }}).catch(err => {{'
+                '        alert("❌ Ошибка: " + err);'
+                '        btn.disabled = false;'
+                '        btn.textContent = "✨ Создать QR-код";'
+                '    }});'
+                '}}'
+                '</script>', 
+                obj.pk
+            )
+    qr_code_actions.short_description = 'Управление QR-кодом'
+    
     def certificates_preview(self, obj):
         """Превью сертификатов с возможностью замены загруженными файлами"""
         if not obj.pk:

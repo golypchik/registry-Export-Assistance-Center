@@ -83,7 +83,7 @@ class Certificate(models.Model):
     # Оставляем старые поля для обратной совместимости и миграции
     iso_standard = models.ForeignKey(ISOStandard, on_delete=models.SET_NULL, verbose_name='Стандарт ISO (устаревшее)', blank=True, null=True)
     iso_standard_name = models.CharField(max_length=255, verbose_name='Наименование стандарта в сертификате', blank=True)
-    quality_management_system = models.TextField('Система менеджмента качества')
+    quality_management_system = models.TextField('Настоящий сертификат удостоверяет')
     start_date = models.DateField('Дата начала действия')
     expiry_date = models.DateField('Дата окончания действия')
     status = models.CharField('Статус', max_length=20, choices=STATUS_CHOICES, default='active')
