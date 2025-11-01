@@ -862,10 +862,58 @@ class CertificateAdmin(admin.ModelAdmin):
             result_html += '</div>'
         
         result_html += '</div>'
+        
+        # Добавляем кнопку регенерации всех файлов
+        if obj.qr_code:
+            result_html += (
+                '<div style="margin-top: 20px; padding: 15px; background: #d1ecf1; border: 2px solid #0c5460; border-radius: 8px; text-align: center;">'
+                '<h4 style="margin: 0 0 10px 0; color: #0c5460;">🔄 Регенерация всех файлов</h4>'
+                '<p style="margin: 0 0 10px 0; font-size: 13px; color: #0c5460;">Перегенерировать все сертификаты, разрешения и аудиты</p>'
+                '<button onclick="regenerateAllCertificates({}); return false;" '
+                'style="padding: 10px 20px; background: #17a2b8; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 14px;">'
+                '🔄 Регенерировать все файлы'
+                '</button>'
+                '</div>'
+                '<script>'
+                'function regenerateAllCertificates(certId) {{'
+                '    if(confirm("Вы уверены? Это перегенерирует все сертификаты, разрешения и аудиты (не затронет uploaded файлы).")) {{'
+                '        const btn = event.target;'
+                '        btn.disabled = true;'
+                '        btn.textContent = "⏳ Генерация... Это может занять 10-30 секунд";'
+                '        fetch("/admin/certificates/certificate/" + certId + "/regenerate-certificates/", {{'
+                '            method: "POST",'
+                '            headers: {{'
+                '                "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,'
+                '                "Content-Type": "application/json"'
+                '            }}'
+                '        }}).then(response => response.json()).then(data => {{'
+                '            if(data.status === "success") {{'
+                '                alert("✅ " + data.message);'
+                '                location.reload();'
+                '            }} else {{'
+                '                alert("❌ " + data.message);'
+                '                btn.disabled = false;'
+                '                btn.textContent = "🔄 Регенерировать все файлы";'
+                '            }}'
+                '        }}).catch(err => {{'
+                '            alert("❌ Ошибка: " + err);'
+                '            btn.disabled = false;'
+                '            btn.textContent = "🔄 Регенерировать все файлы";'
+                '        }});'
+                '    }}'
+                '}}'
+                '</script>'
+            ).format(obj.pk)
+        else:
+            result_html += (
+                '<div style="margin-top: 20px; padding: 15px; background: #fff3cd; border: 2px solid #856404; border-radius: 8px; text-align: center;">'
+                '<h4 style="margin: 0 0 10px 0; color: #856404;">⚠ Сначала создайте QR-код</h4>'
+                '<p style="margin: 0; font-size: 13px; color: #856404;">QR-код необходим для генерации сертификатов</p>'
+                '</div>'
+            )
+        
         return format_html(result_html)
     auditors_certificates_preview.short_description = 'Сертификаты аудиторов'
-
-    actions = ['duplicate_certificates']
 
     class Media:
         js = ('certificates/js/preview.js',)
