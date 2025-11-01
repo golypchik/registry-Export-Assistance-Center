@@ -296,15 +296,16 @@ class Certificate(models.Model):
             qr_img = qr.make_image(fill_color="black", back_color="white")
             qr_img = qr_img.convert("RGBA")
             
-            # Делаем белый фон прозрачным
+            # Делаем белый фон прозрачным и QR-код на 70% прозрачным (альфа 30%)
             data = qr_img.getdata()
             new_data = []
             for item in data:
-                # Если пиксель белый (255, 255, 255), делаем его прозрачным
+                # Если пиксель белый (255, 255, 255), делаем его полностью прозрачным
                 if item[0] == 255 and item[1] == 255 and item[2] == 255:
-                    new_data.append((255, 255, 255, 0))  # Прозрачный
+                    new_data.append((255, 255, 255, 0))  # Полностью прозрачный
                 else:
-                    new_data.append(item)  # Оставляем как есть
+                    # Черные пиксели делаем на 70% прозрачными (30% непрозрачности = альфа 77)
+                    new_data.append((item[0], item[1], item[2], 77))
             
             qr_img.putdata(new_data)
             

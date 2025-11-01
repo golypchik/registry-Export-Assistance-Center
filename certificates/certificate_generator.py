@@ -180,16 +180,11 @@ def generate_audit_certificate(certificate, auditor, with_signatures=False):
         draw_text_in_box(draw, certificate.iso_standard_name, 340, 2051, 2012, 300, 
                          font, color, align='center', valign='top')
         
-        # 3. Дата начала
+        # 3. Дата (только дата начала, в правом поле)
         font = get_font(63, bold=False)
         color = hex_to_rgb('851814')
         start_date = format_date(certificate.start_date)
-        draw_text_in_box(draw, start_date, 1380, 2740, 341, 72, 
-                         font, color, align='center', valign='top')
-        
-        # 4. Дата окончания
-        expiry_date = format_date(certificate.expiry_date)
-        draw_text_in_box(draw, expiry_date, 2007, 2740, 341, 72, 
+        draw_text_in_box(draw, start_date, 2007, 2740, 341, 72, 
                          font, color, align='center', valign='top')
         
         # 5. QR код
