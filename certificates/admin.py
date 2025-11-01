@@ -62,7 +62,7 @@ class CertificateAdmin(admin.ModelAdmin):
     list_filter = ('status', 'identifier_type', 'first_inspection_status', 'second_inspection_status', 'notifications_enabled')
     search_fields = ('name', 'certificate_number_part', 'identifier_value', 'inn')
     date_hierarchy = 'created_at'
-    actions = ['duplicate_certificates', 'regenerate_all_certificates', 'regenerate_qr_codes_action']
+    actions = ['duplicate_certificates', 'regenerate_certificates_action', 'regenerate_qr_codes_action']
     
     def display_identifier_info(self, obj):
         return f"{obj.display_identifier_label}: {obj.display_identifier}"
@@ -207,6 +207,54 @@ class CertificateAdmin(admin.ModelAdmin):
         return HttpResponseRedirect(f'/admin/certificates/certificate/add/?duplicate_from={certificate.id}')
     
     duplicate_certificates.short_description = "Дублировать сертификат"
+    
+    def regenerate_certificates_action(self, request, queryset):
+        """Массовая регенерация сертификатов для выбранных записей"""
+        from .certificate_generator import generate_all_certificates
+        
+        success_count = 0
+        error_count = 0
+        skipped_count = 0
+        
+        for certificate in queryset:
+            try:
+                # Проверяем что есть QR-код (необходим для генерации)
+                if not certificate.qr_code:
+                    skipped_count += 1
+                    logger.warning(f"Пропуск {certificate.name} - нет QR-кода")
+                    continue
+                
+                # Генерируем все сертификаты
+                logger.info(f"Начало регенерации для {certificate.name}")
+                generate_all_certificates(certificate)
+                success_count += 1
+                logger.info(f"Успешно регенерированы сертификаты для {certificate.name}")
+                    
+            except Exception as e:
+                error_count += 1
+                logger.error(f"Ошибка при регенерации сертификатов для {certificate.name}: {e}", exc_info=True)
+        
+        # Сообщения об успехе/ошибках
+        if success_count > 0:
+            self.message_user(
+                request, 
+                f"✅ Успешно регенерировано сертификатов: {success_count}", 
+                level='success'
+            )
+        if skipped_count > 0:
+            self.message_user(
+                request, 
+                f"⚠️ Пропущено (нет QR-кода): {skipped_count}", 
+                level='warning'
+            )
+        if error_count > 0:
+            self.message_user(
+                request, 
+                f"❌ Ошибок при регенерации: {error_count}", 
+                level='error'
+            )
+    
+    regenerate_certificates_action.short_description = "🔄 Регенерировать сертификаты"
     
     def regenerate_qr_codes_action(self, request, queryset):
         """Массовая регенерация QR-кодов для выбранных сертификатов"""
