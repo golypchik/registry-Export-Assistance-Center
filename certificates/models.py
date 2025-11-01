@@ -28,6 +28,22 @@ class ISOStandard(models.Model):
         ordering = ['standard_name']
 
 
+class CertificateISOStandard(models.Model):
+    """Промежуточная модель для связи сертификата с несколькими ISO стандартами"""
+    certificate = models.ForeignKey('Certificate', on_delete=models.CASCADE, related_name='certificate_standards')
+    iso_standard = models.ForeignKey(ISOStandard, on_delete=models.CASCADE, verbose_name='Стандарт ISO')
+    order = models.PositiveIntegerField(default=0, verbose_name='Порядок отображения')
+    
+    class Meta:
+        verbose_name = 'Стандарт ISO сертификата'
+        verbose_name_plural = 'Стандарты ISO сертификата'
+        ordering = ['order']
+        unique_together = ['certificate', 'iso_standard']
+    
+    def __str__(self):
+        return f"{self.certificate.name} - {self.iso_standard.standard_name}"
+
+
 class Certificate(models.Model):
     STATUS_CHOICES = [
         ('active', 'Действителен'),
@@ -56,7 +72,16 @@ class Certificate(models.Model):
     
     certificate_number_part = models.CharField(max_length=5, unique=True, verbose_name="Номер сертификата (часть)")
 
-    iso_standard = models.ForeignKey(ISOStandard, on_delete=models.CASCADE, verbose_name='Стандарт ISO')
+    # Множественные стандарты ISO через промежуточную модель
+    iso_standards = models.ManyToManyField(
+        ISOStandard, 
+        through='CertificateISOStandard',
+        verbose_name='Стандарты ISO',
+        related_name='certificates'
+    )
+    
+    # Оставляем старые поля для обратной совместимости и миграции
+    iso_standard = models.ForeignKey(ISOStandard, on_delete=models.SET_NULL, verbose_name='Стандарт ISO (устаревшее)', blank=True, null=True)
     iso_standard_name = models.CharField(max_length=255, verbose_name='Наименование стандарта в сертификате', blank=True)
     quality_management_system = models.TextField('Система менеджмента качества')
     start_date = models.DateField('Дата начала действия')
@@ -108,8 +133,36 @@ class Certificate(models.Model):
     
     @cached_property
     def full_certificate_number(self):
-        iso_code = self.iso_standard.certificate_number_prefix
-        return f"№SMK.{self.certificate_number_part}{iso_code}"
+        """Возвращает полный номер сертификата с префиксами всех стандартов"""
+        # Получаем первый стандарт для номера сертификата
+        first_standard = self.get_first_iso_standard()
+        if first_standard:
+            iso_code = first_standard.certificate_number_prefix
+            return f"№SMK.{self.certificate_number_part}{iso_code}"
+        # Обратная совместимость со старым полем
+        elif self.iso_standard:
+            iso_code = self.iso_standard.certificate_number_prefix
+            return f"№SMK.{self.certificate_number_part}{iso_code}"
+        return f"№SMK.{self.certificate_number_part}"
+    
+    def get_first_iso_standard(self):
+        """Возвращает первый ISO стандарт (для номера сертификата)"""
+        first_cert_standard = self.certificate_standards.first()
+        return first_cert_standard.iso_standard if first_cert_standard else None
+    
+    def get_all_iso_standards(self):
+        """Возвращает все ISO стандарты в правильном порядке"""
+        return [cs.iso_standard for cs in self.certificate_standards.all()]
+    
+    def get_iso_standards_display(self):
+        """Возвращает строку со всеми стандартами для отображения (каждый с новой строки)"""
+        standards = self.get_all_iso_standards()
+        if standards:
+            return '\n'.join([std.certificate_standard_name for std in standards])
+        # Обратная совместимость
+        elif self.iso_standard:
+            return self.iso_standard.certificate_standard_name
+        return self.iso_standard_name or ''
     
     @property
     def display_identifier(self):
@@ -373,8 +426,12 @@ class Certificate(models.Model):
             self.identifier_value = self.inn
             self.identifier_type = 'inn'
         
-        # Устанавливаем название стандарта (обновляем при каждом сохранении если есть iso_standard)
+        # Устанавливаем название стандарта (обновляем при каждом сохранении)
+        # Теперь используем все стандарты через get_iso_standards_display()
+        # Но это можно сделать только после сохранения, так как нужен доступ к M2M
+        # Поэтому обновляем iso_standard_name в post_save сигнале или после добавления стандартов
         if self.iso_standard:
+            # Обратная совместимость - если используется старое поле
             self.iso_standard_name = self.iso_standard.certificate_standard_name
         
         # Устанавливаем даты инспекций для новых сертификатов
@@ -442,7 +499,15 @@ class Certificate(models.Model):
     def generate_audit_number(self):
         """Генерация номера аудита"""
         audits_count = self.auditors.count()
-        iso_code = self.iso_standard.certificate_number_prefix
+        # Используем первый стандарт для номера аудита
+        first_standard = self.get_first_iso_standard()
+        if first_standard:
+            iso_code = first_standard.certificate_number_prefix
+        elif self.iso_standard:
+            # Обратная совместимость
+            iso_code = self.iso_standard.certificate_number_prefix
+        else:
+            iso_code = ""
         return f"№AUD.{audits_count + 1:02d}{iso_code}"
     
     class Meta:
@@ -580,6 +645,7 @@ def auditor_delete_files(sender, instance, **kwargs):
 def generate_certificate_images(sender, instance, created, **kwargs):
     """
     Автоматически генерирует изображения сертификатов после сохранения
+    НЕ генерирует сразу, так как M2M связи еще не сохранены
     """
     # Проверяем, что это не рекурсивный вызов
     if kwargs.get('update_fields'):
@@ -594,14 +660,22 @@ def generate_certificate_images(sender, instance, created, **kwargs):
         logger.info(f"QR-код еще не создан для сертификата {instance.id}, пропускаем генерацию")
         return
     
-    # Импортируем генератор здесь, чтобы избежать циклических импортов
-    from .certificate_generator import generate_all_certificates
-    
-    try:
-        logger.info(f"Запуск генерации сертификатов для {instance.name} (ID: {instance.id})")
-        generate_all_certificates(instance)
-    except Exception as e:
-        logger.error(f"Ошибка при автоматической генерации сертификатов: {e}", exc_info=True)
+    # Если есть старое поле iso_standard (для обратной совместимости), генерируем сразу
+    if instance.iso_standard and not instance.certificate_standards.exists():
+        from .certificate_generator import generate_all_certificates
+        try:
+            logger.info(f"Найден старый стандарт для {instance.name}, генерируем сертификаты")
+            generate_all_certificates(instance)
+        except Exception as e:
+            logger.error(f"Ошибка при генерации сертификатов: {e}", exc_info=True)
+    else:
+        # НЕ генерируем здесь - будет генерация в m2m_changed сигнале
+        logger.info(f"Сертификат {instance.name} (ID: {instance.id}) сохранен, ожидаем сохранения ISO стандартов")
+
+
+# ПРИМЕЧАНИЕ: Сигнал m2m_changed НЕ работает для промежуточных моделей (through)
+# когда данные сохраняются через inline формы в админке.
+# Поэтому генерация вызывается вручную в save_formset метода CertificateAdmin
 
 
 @receiver(post_save, sender=Auditor)

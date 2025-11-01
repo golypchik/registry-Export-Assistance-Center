@@ -9,16 +9,7 @@ class CertificateAdminForm(forms.ModelForm):
         fields = '__all__'
 
 class CertificateForm(forms.ModelForm):
-    iso_standard = forms.ModelChoiceField(
-        queryset=ISOStandard.objects.all(),
-        label='Стандарт ИСО',
-        widget=forms.Select(attrs={'class': 'form-control'})
-    )
-    iso_standard_name = forms.CharField(
-        label='Наименование стандарта в сертификате',
-        required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'readonly': 'readonly'})
-    )
+    # Убираем старое поле iso_standard из формы, теперь используется inline в админке
     
     # Поля для удаления файлов
     file1_cleared = forms.BooleanField(required=False, label="Удалить файл сертификата")
@@ -27,8 +18,8 @@ class CertificateForm(forms.ModelForm):
     
     class Meta:
         model = Certificate
-        fields = ['name', 'identifier_type', 'identifier_value', 'address', 'certificate_number_part', 'iso_standard',
-                  'iso_standard_name', 'quality_management_system', 'start_date', 'expiry_date',
+        fields = ['name', 'identifier_type', 'identifier_value', 'address', 'certificate_number_part',
+                  'quality_management_system', 'start_date', 'expiry_date',
                   'status', 'first_inspection_date', 'first_inspection_status',
                   'second_inspection_date', 'second_inspection_status',
                   'file1', 'file2', 'auditor_certificate', 'client_email', 'notifications_enabled',
@@ -48,8 +39,6 @@ class CertificateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance.iso_standard:
-            self.fields['iso_standard_name'].initial = self.instance.iso_standard.certificate_standard_name
         
         if not self.instance.pk:
             self.fields['certificate_number_part'].initial = self.get_next_number()

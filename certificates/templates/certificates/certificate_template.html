@@ -36,7 +36,7 @@
                 '%%INN%%': '{{ certificate.display_identifier|escapejs }}',
                 '%%ADDRESS%%': '{{ certificate.address|escapejs }}',
                 '%%QUALITY_MANAGEMENT_SYSTEM%%': '{{ certificate.quality_management_system|escapejs }}',
-                '%%ISO_STANDARD%%': '{{ certificate.iso_standard.certificate_standard_name|escapejs }}',
+                '%%ISO_STANDARD%%': '{{ certificate.get_iso_standards_display|escapejs }}',
                 '%%START_DATE%%': '{{ certificate.start_date|date:"d.m.Y"|escapejs }}',
                 '%%EXPIRY_DATE%%': '{{ certificate.expiry_date|date:"d.m.Y"|escapejs }}',
                 '%%QR%%': '{{ qr_code_url|escapejs }}',

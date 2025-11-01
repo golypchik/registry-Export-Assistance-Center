@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.html import format_html, mark_safe
 from django.http import HttpResponse, HttpResponseRedirect
 from django.conf import settings
-from .models import Certificate, ISOStandard, Auditor
+from .models import Certificate, ISOStandard, Auditor, CertificateISOStandard
 import re
 import os
 import logging
@@ -22,6 +22,14 @@ def get_file_preview(file):
         else:
             return format_html('<a href="{}" target="_blank">Скачать файл</a>', file.url)
     return "Нет файла"
+
+class CertificateISOStandardInline(admin.TabularInline):
+    model = CertificateISOStandard
+    extra = 1
+    fields = ('iso_standard', 'order')
+    verbose_name = 'Стандарт ISO'
+    verbose_name_plural = 'Стандарты ISO'
+    ordering = ['order']
 
 class AuditorInline(admin.TabularInline):
     model = Auditor
@@ -47,17 +55,28 @@ class CertificateAdminForm(forms.ModelForm):
 @admin.register(Certificate)
 class CertificateAdmin(admin.ModelAdmin):
     form = CertificateAdminForm
-    inlines = [AuditorInline]
-    list_display = ('name', 'full_certificate_number', 'display_identifier_info', 'iso_standard', 'iso_standard_name', 'status', 
+    inlines = [CertificateISOStandardInline, AuditorInline]
+    list_display = ('name', 'full_certificate_number', 'display_identifier_info', 'display_iso_standards', 'status', 
                     'first_inspection_status', 'second_inspection_status',
                     'start_date', 'expiry_date', 'notifications_enabled')
-    list_filter = ('status', 'iso_standard', 'identifier_type', 'first_inspection_status', 'second_inspection_status', 'notifications_enabled')
+    list_filter = ('status', 'identifier_type', 'first_inspection_status', 'second_inspection_status', 'notifications_enabled')
     search_fields = ('name', 'certificate_number_part', 'identifier_value', 'inn')
     date_hierarchy = 'created_at'
     
     def display_identifier_info(self, obj):
         return f"{obj.display_identifier_label}: {obj.display_identifier}"
     display_identifier_info.short_description = "Идентификатор"
+    
+    def display_iso_standards(self, obj):
+        """Отображает все ISO стандарты сертификата"""
+        standards = obj.get_all_iso_standards()
+        if standards:
+            return ', '.join([std.standard_name for std in standards])
+        # Обратная совместимость
+        elif obj.iso_standard:
+            return obj.iso_standard.standard_name
+        return '-'
+    display_iso_standards.short_description = "Стандарты ISO"
 
     exclude = ('additional_files',)
     
@@ -66,8 +85,9 @@ class CertificateAdmin(admin.ModelAdmin):
             'fields': ('name', 'identifier_type', 'identifier_value', 'address')
         }),
         ('Информация о сертификате', {
-            'fields': ('certificate_number_part', 'iso_standard', 'iso_standard_name', 'quality_management_system', 
-                      'start_date', 'expiry_date', 'status', 'validity_period', 'certification_area')
+            'fields': ('certificate_number_part', 'quality_management_system', 
+                      'start_date', 'expiry_date', 'status', 'validity_period', 'certification_area'),
+            'description': 'Стандарты ISO добавляются в секции "Стандарты ISO" ниже'
         }),
         ('Инспекционный контроль', {
             'fields': ('first_inspection_date', 'first_inspection_status',
@@ -93,14 +113,25 @@ class CertificateAdmin(admin.ModelAdmin):
     readonly_fields = ('permissions_preview', 'certificates_preview', 
                        'auditors_certificates_preview', 'qr_code')
 
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "iso_standard":
-            kwargs["queryset"] = ISOStandard.objects.all().order_by('standard_name')
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
     def save_model(self, request, obj, form, change):
         # Сохраняем модель
+        is_new = obj.pk is None
         super().save_model(request, obj, form, change)
+        
+        # Если это дублирование, создаем связи ISO стандартов
+        if is_new and 'duplicate_certificate_data' in request.session:
+            duplicate_data = request.session['duplicate_certificate_data']
+            iso_standards_data = duplicate_data.get('iso_standards', [])
+            
+            if iso_standards_data:
+                logger.info(f"Создание {len(iso_standards_data)} связей ISO стандартов")
+                for std_data in iso_standards_data:
+                    CertificateISOStandard.objects.create(
+                        certificate=obj,
+                        iso_standard_id=std_data['iso_standard_id'],
+                        order=std_data['order']
+                    )
+                logger.info("Связи ISO стандартов созданы")
         
         # Очищаем данные дублирования из сессии после успешного сохранения
         if 'duplicate_certificate_data' in request.session:
@@ -108,24 +139,44 @@ class CertificateAdmin(admin.ModelAdmin):
             logger.info("Данные дублирования очищены из сессии")
 
     def save_formset(self, request, form, formset, change):
-        """Сохранение формсета аудиторов"""
+        """Сохранение формсетов (аудиторы и ISO стандарты)"""
         instances = formset.save(commit=False)
         
+        # Флаг для отслеживания изменения ISO стандартов
+        iso_standards_changed = False
+        
         for instance in instances:
-            if not instance.pk:  # Новый аудитор
-                instance.save()  # Сохраняем для получения ID
-                
-                # Генерируем номер аудита если его нет
-                if not instance.audit_number:
-                    instance.audit_number = form.instance.generate_audit_number()
+            # Проверяем, что это аудитор (а не ISO стандарт)
+            if isinstance(instance, Auditor):
+                if not instance.pk:  # Новый аудитор
+                    instance.save()  # Сохраняем для получения ID
+                    
+                    # Генерируем номер аудита если его нет
+                    if not instance.audit_number:
+                        instance.audit_number = form.instance.generate_audit_number()
+            elif isinstance(instance, CertificateISOStandard):
+                # Это ISO стандарт - отмечаем, что нужна регенерация
+                iso_standards_changed = True
             
             instance.save()
         
         # Удаляем отмеченные для удаления объекты
         for obj in formset.deleted_objects:
             obj.delete()
+            # Если удалили ISO стандарт - тоже нужна регенерация
+            if isinstance(obj, CertificateISOStandard):
+                iso_standards_changed = True
         
         formset.save_m2m()
+        
+        # Если изменились ISO стандарты - регенерируем сертификаты
+        if iso_standards_changed and form.instance.qr_code:
+            from .certificate_generator import generate_all_certificates
+            try:
+                logger.info(f"ISO стандарты изменены через админку для {form.instance.name}, запуск генерации")
+                generate_all_certificates(form.instance)
+            except Exception as e:
+                logger.error(f"Ошибка при генерации сертификатов: {e}", exc_info=True)
 
     def duplicate_certificates(self, request, queryset):
         """Действие для дублирования сертификатов"""
@@ -302,6 +353,23 @@ class CertificateAdmin(admin.ModelAdmin):
                 
                 logger.info(f"Найдено {len(auditors_data)} аудиторов для дублирования")
                 
+                # Собираем данные ISO стандартов
+                iso_standards_data = []
+                for cert_std in original_certificate.certificate_standards.all():
+                    iso_standards_data.append({
+                        'iso_standard_id': cert_std.iso_standard.id,
+                        'order': cert_std.order,
+                    })
+                
+                # Обратная совместимость - если используется старое поле
+                if not iso_standards_data and original_certificate.iso_standard:
+                    iso_standards_data.append({
+                        'iso_standard_id': original_certificate.iso_standard.id,
+                        'order': 0,
+                    })
+                
+                logger.info(f"Найдено {len(iso_standards_data)} стандартов ISO для дублирования")
+                
                 # Сохраняем данные в сессии
                 request.session['duplicate_certificate_data'] = {
                     'name': original_certificate.name,
@@ -310,8 +378,6 @@ class CertificateAdmin(admin.ModelAdmin):
                     'inn': original_certificate.inn,
                     'address': original_certificate.address,
                     'certificate_number_part': Certificate.get_next_number(),
-                    'iso_standard_id': original_certificate.iso_standard.id,
-                    'iso_standard_name': original_certificate.iso_standard_name,
                     'quality_management_system': original_certificate.quality_management_system,
                     'start_date': original_certificate.start_date.isoformat(),
                     'expiry_date': original_certificate.expiry_date.isoformat(),
@@ -325,6 +391,7 @@ class CertificateAdmin(admin.ModelAdmin):
                     'notifications_enabled': original_certificate.notifications_enabled,
                     'certification_area': original_certificate.certification_area,
                     'auditors': auditors_data,
+                    'iso_standards': iso_standards_data,
                 }
                 
                 logger.info("Данные сохранены в сессии")

@@ -45,7 +45,13 @@
                                         <td>{{ certificate.name }}</td>
                                         <td>{{ certificate.certificate_number }}</td>
                                         <td>{{ certificate.inn }}</td>
-                                        <td>{{ certificate.iso_standard }}</td>
+                                        <td>
+                                            {% for std in certificate.get_all_iso_standards %}
+                                                {{ std.standard_name }}{% if not forloop.last %}, {% endif %}
+                                            {% empty %}
+                                                {{ certificate.iso_standard }}
+                                            {% endfor %}
+                                        </td>
                                         <td>
                                             {% if certificate.status == 'active' %}
                                                 <span class="badge bg-success">Действителен</span>

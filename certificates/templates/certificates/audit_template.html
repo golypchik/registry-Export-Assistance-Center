@@ -33,7 +33,7 @@
             var auditData = {
                 '%%AUDIT_NUMBER%%': '{{ auditor.audit_number }}', 
                 '%%AUDIT_NAME%%': '{{ auditor.full_name }}',
-                '%%ISO_STANDARD%%': '{{ certificate.iso_standard.certificate_standard_name }}',
+                '%%ISO_STANDARD%%': '{{ certificate.get_iso_standards_display|escapejs }}',
                 '%%START_DATE%%': '{{ certificate.start_date|date:"d.m.Y" }}',
                 '%%EXPIRY_DATE%%': '{{ certificate.expiry_date|date:"d.m.Y" }}',
                 '%%QR%%': '{{ qr_data_uri|safe }}',

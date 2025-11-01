@@ -145,6 +145,87 @@ def draw_text_in_box(draw, text, x, y, width, height, font, color, align='center
     return total_height
 
 
+def draw_iso_standards_column(draw, certificate, x, y, width, height, font, color, align='center', valign='top'):
+    """
+    Рисует несколько ISO стандартов столбиком (каждый с новой строки)
+    
+    Возвращает фактическую высоту отрисованного текста
+    """
+    iso_standards = certificate.get_all_iso_standards()
+    
+    # Если нет новых стандартов, используем старое поле для обратной совместимости
+    if not iso_standards and certificate.iso_standard:
+        iso_standards = [certificate.iso_standard]
+    
+    if not iso_standards:
+        # Если совсем нет стандартов, используем iso_standard_name
+        if certificate.iso_standard_name:
+            return draw_text_in_box(draw, certificate.iso_standard_name, x, y, width, height, 
+                                   font, color, align, valign)
+        return 0
+    
+    # Получаем названия всех стандартов
+    standard_names = [std.certificate_standard_name for std in iso_standards]
+    
+    # Объединяем в одну строку с переносами
+    combined_text = '\n'.join(standard_names)
+    
+    # Разбиваем по переносам строк для корректной отрисовки
+    lines = []
+    for standard_name in standard_names:
+        # Каждый стандарт может сам переноситься, если слишком длинный
+        words = standard_name.split()
+        current_line = ""
+        
+        for word in words:
+            test_line = current_line + word + " "
+            bbox = draw.textbbox((0, 0), test_line, font=font)
+            text_width = bbox[2] - bbox[0]
+            
+            if text_width <= width:
+                current_line = test_line
+            else:
+                if current_line:
+                    lines.append(current_line.strip())
+                    current_line = word + " "
+                else:
+                    lines.append(word)
+                    current_line = ""
+        
+        if current_line:
+            lines.append(current_line.strip())
+    
+    # Вычисляем высоту текста
+    line_height = font.size + 10  # Межстрочный интервал
+    total_height = len(lines) * line_height
+    
+    # Определяем начальную позицию Y с учетом вертикального выравнивания
+    if valign == 'center':
+        start_y = y + (height - total_height) // 2
+    elif valign == 'bottom':
+        start_y = y + height - total_height
+    else:  # top
+        start_y = y
+    
+    # Рисуем каждую строку
+    current_y = start_y
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        text_width = bbox[2] - bbox[0]
+        
+        if align == 'center':
+            line_x = x + (width - text_width) // 2
+        elif align == 'right':
+            line_x = x + width - text_width
+        else:  # left
+            line_x = x
+        
+        draw.text((line_x, current_y), line, font=font, fill=color)
+        current_y += line_height
+    
+    return total_height
+
+
 def get_background_path(filename):
     """Получает путь к файлу фона"""
     return os.path.join(settings.BASE_DIR, 'templates', 'background', filename)
@@ -174,11 +255,11 @@ def generate_audit_certificate(certificate, auditor, with_signatures=False):
         draw_text_in_box(draw, auditor.audit_number, 340, 864, 1200, 72, 
                          font, color, align='left', valign='top')
         
-        # 2. ISO стандарт
+        # 2. ISO стандарты (может быть несколько, отображаются столбиком)
         font = get_font(63, bold=True)
         color = hex_to_rgb('000000')
-        draw_text_in_box(draw, certificate.iso_standard_name, 340, 2051, 2012, 300, 
-                         font, color, align='center', valign='top')
+        draw_iso_standards_column(draw, certificate, 340, 2051, 2012, 300, 
+                                 font, color, align='center', valign='top')
         
         # 3. Дата (только дата начала, в правом поле)
         font = get_font(63, bold=False)
@@ -266,10 +347,10 @@ def generate_main_certificate(certificate, with_signatures=False):
         draw_text_in_box(draw, certificate.address, 340, y3, 2012, 300, 
                          font, color, align='center', valign='top')
         
-        # 4. ISO стандарт
+        # 4. ISO стандарты (может быть несколько, отображаются столбиком)
         font = get_font(63, bold=True)
-        draw_text_in_box(draw, certificate.iso_standard_name, 340, 2320, 2012, 300, 
-                         font, color, align='center', valign='top')
+        draw_iso_standards_column(draw, certificate, 340, 2320, 2012, 300, 
+                                 font, color, align='center', valign='top')
         
         # 5. Дата начала
         font = get_font(63, bold=False)

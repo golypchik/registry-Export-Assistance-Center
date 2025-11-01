@@ -38,8 +38,14 @@
                             <div class="col-md-8">{{ certificate.address }}</div>
                         </div>
                         <div class="row mb-3">
-                            <div class="col-md-4 fw-bold">Стандарт:</div>
-                            <div class="col-md-8">{{ certificate.iso_standard }}</div>
+                            <div class="col-md-4 fw-bold">Стандарт{{ certificate.get_all_iso_standards|length|pluralize:"ы" }}:</div>
+                            <div class="col-md-8">
+                                {% for std in certificate.get_all_iso_standards %}
+                                    {{ std.certificate_standard_name }}{% if not forloop.last %}<br>{% endif %}
+                                {% empty %}
+                                    {{ certificate.iso_standard }}
+                                {% endfor %}
+                            </div>
                         </div>
                         <div class="row mb-3">
                             <div class="col-md-4 fw-bold">Система менеджмента качества:</div>
