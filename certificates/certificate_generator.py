@@ -296,6 +296,12 @@ def generate_audit_certificate(certificate, auditor, with_signatures=False):
                 ruk = Image.open(ruk_path)
                 bg.paste(ruk, (1709, 3087), ruk if ruk.mode == 'RGBA' else None)
         
+        # Обрезаем белые поля по 104 пикселя со всех сторон
+        width, height = bg.size
+        crop_box = (104, 104, width - 104, height - 104)
+        bg = bg.crop(crop_box)
+        logger.info(f"Обрезка аудита: исходный размер {width}x{height} -> обрезанный {bg.size[0]}x{bg.size[1]}")
+        
         # Сохраняем результат в BytesIO
         # Используем JPEG вместо PNG для более быстрой и надежной обработки
         buffer = BytesIO()
@@ -402,6 +408,12 @@ def generate_main_certificate(certificate, with_signatures=False):
                 ruk = Image.open(ruk_path)
                 bg.paste(ruk, (1709, 3087), ruk if ruk.mode == 'RGBA' else None)
         
+        # Обрезаем белые поля по 104 пикселя со всех сторон
+        width, height = bg.size
+        crop_box = (104, 104, width - 104, height - 104)
+        bg = bg.crop(crop_box)
+        logger.info(f"Обрезка сертификата: исходный размер {width}x{height} -> обрезанный {bg.size[0]}x{bg.size[1]}")
+        
         # Сохраняем результат в BytesIO
         # Используем JPEG вместо PNG для более быстрой и надежной обработки
         buffer = BytesIO()
@@ -477,6 +489,12 @@ def generate_permission_certificate(certificate, with_signatures=False):
             if os.path.exists(per_path):
                 per = Image.open(per_path)
                 bg.paste(per, (1705, 2930), per if per.mode == 'RGBA' else None)
+        
+        # Обрезаем белые поля по 104 пикселя со всех сторон
+        width, height = bg.size
+        crop_box = (104, 104, width - 104, height - 104)
+        bg = bg.crop(crop_box)
+        logger.info(f"Обрезка разрешения: исходный размер {width}x{height} -> обрезанный {bg.size[0]}x{bg.size[1]}")
         
         # Сохраняем результат в BytesIO
         # Используем JPEG вместо PNG для более быстрой и надежной обработки

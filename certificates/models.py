@@ -134,15 +134,23 @@ class Certificate(models.Model):
     @cached_property
     def full_certificate_number(self):
         """Возвращает полный номер сертификата с префиксами всех стандартов"""
-        # Получаем первый стандарт для номера сертификата
-        first_standard = self.get_first_iso_standard()
-        if first_standard:
-            iso_code = first_standard.certificate_number_prefix
+        # Получаем все стандарты для определения окончания номера
+        all_standards = self.get_all_iso_standards()
+        
+        # Если 2 или более стандартов - используем .IMS
+        if len(all_standards) >= 2:
+            return f"№SMK.{self.certificate_number_part}.IMS"
+        
+        # Если один стандарт - используем его код
+        if len(all_standards) == 1:
+            iso_code = all_standards[0].certificate_number_prefix
             return f"№SMK.{self.certificate_number_part}{iso_code}"
+        
         # Обратная совместимость со старым полем
         elif self.iso_standard:
             iso_code = self.iso_standard.certificate_number_prefix
             return f"№SMK.{self.certificate_number_part}{iso_code}"
+        
         return f"№SMK.{self.certificate_number_part}"
     
     def get_first_iso_standard(self):
@@ -499,21 +507,28 @@ class Certificate(models.Model):
     def generate_audit_number(self):
         """Генерация номера аудита"""
         audits_count = self.auditors.count()
-        # Используем первый стандарт для номера аудита
-        first_standard = self.get_first_iso_standard()
-        if first_standard:
-            iso_code = first_standard.certificate_number_prefix
+        
+        # Получаем все стандарты для определения окончания номера
+        all_standards = self.get_all_iso_standards()
+        
+        # Если 2 или более стандартов - используем .IMS
+        if len(all_standards) >= 2:
+            iso_code = ".IMS"
+        # Если один стандарт - используем его код
+        elif len(all_standards) == 1:
+            iso_code = all_standards[0].certificate_number_prefix
+        # Обратная совместимость со старым полем
         elif self.iso_standard:
-            # Обратная совместимость
             iso_code = self.iso_standard.certificate_number_prefix
         else:
             iso_code = ""
+        
         return f"№AUD.{audits_count + 1:02d}{iso_code}"
     
     class Meta:
         verbose_name = 'Сертификат'
         verbose_name_plural = 'Сертификаты'
-        ordering = ['-created_at']
+        ordering = ['-certificate_number_part']  # Сортировка по номеру (от новых к старым)
 
 
 class Auditor(models.Model):

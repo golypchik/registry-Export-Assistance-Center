@@ -98,20 +98,20 @@ class CertificateAdmin(admin.ModelAdmin):
             'fields': ('qr_code_actions',),
             'description': 'QR-код автоматически создается при сохранении сертификата'
         }),
-        ('⚠️ Важно: Регенерация сертификатов', {
+        ('⚠️ Важно: Обновление сертификатов', {
             'fields': (),
-            'description': '<strong style="color: #d63301;">Сертификаты НЕ регенерируются автоматически при сохранении для предотвращения таймаутов.</strong><br>'
-                          'Используйте кнопки "Регенерировать сертификаты" в поле действий списка всех сертификатов.<br>'
-                          '<em>Сертификаты будут автоматически регенерированы только при изменении ISO стандартов.</em>'
+            'description': '<strong style="color: #d63301;">Сертификаты НЕ обновляются автоматически при сохранении для предотвращения таймаутов.</strong><br>'
+                          'Используйте кнопки "Обновить сертификаты" в поле действий списка всех сертификатов.<br>'
+                          '<em>Сертификаты будут автоматически обновлены только при изменении ISO стандартов.</em>'
         }),
         ('Файлы', {
             'fields': (
-                'permissions_preview',
-                'uploaded_permission',
-                'uploaded_permission_signed',
                 'certificates_preview',
                 'uploaded_certificate',
                 'uploaded_certificate_signed',
+                'permissions_preview',
+                'uploaded_permission',
+                'uploaded_permission_signed',
                 'auditors_certificates_preview',
             )
         }),
@@ -148,8 +148,8 @@ class CertificateAdmin(admin.ModelAdmin):
             del request.session['duplicate_certificate_data']
             logger.info("Данные дублирования очищены из сессии")
         
-        # НЕ регенерируем автоматически - это вызывает таймаут на продакшене
-        # Пользователь может использовать кнопку "Регенерировать сертификаты"
+        # НЕ обновляем автоматически - это вызывает таймаут на продакшене
+        # Пользователь может использовать кнопку "Обновить сертификаты"
         # request._regenerate_certificates = True
 
     def save_formset(self, request, form, formset, change):
@@ -254,7 +254,7 @@ class CertificateAdmin(admin.ModelAdmin):
                 level='error'
             )
     
-    regenerate_certificates_action.short_description = "🔄 Регенерировать сертификаты"
+    regenerate_certificates_action.short_description = "🔄 Обновить сертификаты"
     
     def regenerate_qr_codes_action(self, request, queryset):
         """Массовая регенерация QR-кодов для выбранных сертификатов"""
@@ -299,7 +299,7 @@ class CertificateAdmin(admin.ModelAdmin):
                 level='warning'
             )
     
-    regenerate_qr_codes_action.short_description = "🔄 Регенерировать QR-коды"
+    regenerate_qr_codes_action.short_description = "🔄 Обновить QR-коды"
 
     
     def get_urls(self):
@@ -808,78 +808,114 @@ class CertificateAdmin(admin.ModelAdmin):
     
     def auditors_certificates_preview(self, obj):
         """Предпросмотр всех сертификатов аудиторов"""
+        logger.info(f"=" * 80)
+        logger.info(f"НАЧАЛО auditors_certificates_preview для сертификата ID={obj.pk if obj.pk else 'НЕТ PK'}")
+        
         if not obj.pk:
+            logger.warning("Нет PK у объекта - сертификат не сохранен")
             return "Сохраните сертификат для просмотра"
         
         auditors = obj.auditors.all()
+        logger.info(f"Найдено аудиторов: {auditors.count()}")
         
         if not auditors:
+            logger.warning("Нет аудиторов у сертификата")
             return "Нет аудиторов"
         
         result_html = '<div style="display: flex; flex-direction: column; gap: 15px;">'
         
-        for auditor in auditors:
+        for idx, auditor in enumerate(auditors, 1):
+            logger.info(f"-" * 60)
+            logger.info(f"АУДИТОР #{idx}: {auditor.full_name} (ID={auditor.pk})")
+            logger.info(f"  uploaded_audit: {bool(auditor.uploaded_audit)}")
+            logger.info(f"  uploaded_audit_signed: {bool(auditor.uploaded_audit_signed)}")
+            logger.info(f"  generated_audit: {bool(auditor.generated_audit)}")
+            logger.info(f"  generated_audit_signed: {bool(auditor.generated_audit_signed)}")
+            
             result_html += format_html(
                 '<div style="border: 2px solid #2b2b2b; padding: 15px; border-radius: 8px; background: #1a1a1a;">'
                 '<h3 style="margin-top: 0; color: #4a9eff;">{}</h3>',
                 auditor.full_name
             )
             
-            # Сгенерированный аудит (без подписей)
-            if auditor.generated_audit:
+            # Аудит (без подписей) - приоритет: uploaded > generated
+            logger.info(f"  Вызов get_audit_image(with_signatures=False)")
+            audit_image = auditor.get_audit_image(with_signatures=False)
+            logger.info(f"  Результат get_audit_image(False): {audit_image}")
+            
+            if audit_image:
+                source_text = "📤 Загружен" if auditor.uploaded_audit else "🤖 Сгенерирован"
+                logger.info(f"  ✅ Есть изображение БЕЗ подписей: {source_text}")
+                logger.info(f"  URL: {audit_image.url if hasattr(audit_image, 'url') else 'НЕТ URL'}")
+                
                 result_html += format_html(
                     '<div style="margin-bottom: 10px;">'
-                    '<strong style="color: #ccc;">Без подписей:</strong><br>'
+                    '<strong style="color: #ccc;">{} - Без подписей:</strong><br>'
                     '<a href="{}" target="_blank">'
                     '<img src="{}" style="max-width: 150px; cursor: pointer; margin-top: 5px; border: 1px solid #444;" title="Нажмите для открытия в полном размере">'
                     '</a><br>'
                     '<a href="{}" download style="font-size: 11px; color: #4a9eff;">Скачать</a>'
                     '</div>',
-                    auditor.generated_audit.url,
-                    auditor.generated_audit.url,
-                    auditor.generated_audit.url
+                    source_text,
+                    audit_image.url,
+                    audit_image.url,
+                    audit_image.url
                 )
             else:
+                logger.warning(f"  ❌ НЕТ изображения БЕЗ подписей")
                 result_html += '<div style="margin-bottom: 10px; color: #888;">Без подписей: Не сгенерирован</div>'
             
-            # Сгенерированный аудит (с подписями)
-            if auditor.generated_audit_signed:
+            # Аудит (с подписями) - приоритет: uploaded > generated
+            logger.info(f"  Вызов get_audit_image(with_signatures=True)")
+            audit_image_signed = auditor.get_audit_image(with_signatures=True)
+            logger.info(f"  Результат get_audit_image(True): {audit_image_signed}")
+            
+            if audit_image_signed:
+                source_text = "📤 Загружен" if auditor.uploaded_audit_signed else "🤖 Сгенерирован"
+                logger.info(f"  ✅ Есть изображение С подписями: {source_text}")
+                logger.info(f"  URL: {audit_image_signed.url if hasattr(audit_image_signed, 'url') else 'НЕТ URL'}")
+                
                 result_html += format_html(
                     '<div>'
-                    '<strong style="color: #ccc;">С подписями:</strong><br>'
+                    '<strong style="color: #ccc;">{} - С подписями:</strong><br>'
                     '<a href="{}" target="_blank">'
                     '<img src="{}" style="max-width: 150px; cursor: pointer; margin-top: 5px; border: 1px solid #444;" title="Нажмите для открытия в полном размере">'
                     '</a><br>'
                     '<a href="{}" download style="font-size: 11px; color: #4a9eff;">Скачать</a>'
                     '</div>',
-                    auditor.generated_audit_signed.url,
-                    auditor.generated_audit_signed.url,
-                    auditor.generated_audit_signed.url
+                    source_text,
+                    audit_image_signed.url,
+                    audit_image_signed.url,
+                    audit_image_signed.url
                 )
             else:
+                logger.warning(f"  ❌ НЕТ изображения С подписями")
                 result_html += '<div style="color: #888;">С подписями: Не сгенерирован</div>'
             
             result_html += '</div>'
         
+        logger.info(f"=" * 80)
+        logger.info(f"КОНЕЦ auditors_certificates_preview")
+        
         result_html += '</div>'
         
-        # Добавляем кнопку регенерации всех файлов
+        # Добавляем кнопку обновления всех файлов
         if obj.qr_code:
             result_html += (
                 '<div style="margin-top: 20px; padding: 15px; background: #d1ecf1; border: 2px solid #0c5460; border-radius: 8px; text-align: center;">'
-                '<h4 style="margin: 0 0 10px 0; color: #0c5460;">🔄 Регенерация всех файлов</h4>'
-                '<p style="margin: 0 0 10px 0; font-size: 13px; color: #0c5460;">Перегенерировать все сертификаты, разрешения и аудиты</p>'
+                '<h4 style="margin: 0 0 10px 0; color: #0c5460;">🔄 Обновление всех файлов</h4>'
+                '<p style="margin: 0 0 10px 0; font-size: 13px; color: #0c5460;">Обновить все сертификаты, разрешения и аудиты</p>'
                 '<button onclick="regenerateAllCertificates({}); return false;" '
                 'style="padding: 10px 20px; background: #17a2b8; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 14px;">'
-                '🔄 Регенерировать все файлы'
+                '🔄 Обновить все файлы'
                 '</button>'
                 '</div>'
                 '<script>'
                 'function regenerateAllCertificates(certId) {{'
-                '    if(confirm("Вы уверены? Это перегенерирует все сертификаты, разрешения и аудиты (не затронет uploaded файлы).")) {{'
+                '    if(confirm("Вы уверены? Это обновит все сертификаты, разрешения и аудиты (не затронет uploaded файлы).")) {{'
                 '        const btn = event.target;'
                 '        btn.disabled = true;'
-                '        btn.textContent = "⏳ Генерация... Это может занять 10-30 секунд";'
+                '        btn.textContent = "⏳ Обновление... Это может занять 10-30 секунд";'
                 '        fetch("/admin/certificates/certificate/" + certId + "/regenerate-certificates/", {{'
                 '            method: "POST",'
                 '            headers: {{'
@@ -893,12 +929,12 @@ class CertificateAdmin(admin.ModelAdmin):
                 '            }} else {{'
                 '                alert("❌ " + data.message);'
                 '                btn.disabled = false;'
-                '                btn.textContent = "🔄 Регенерировать все файлы";'
+                '                btn.textContent = "🔄 Обновить все файлы";'
                 '            }}'
                 '        }}).catch(err => {{'
                 '            alert("❌ Ошибка: " + err);'
                 '            btn.disabled = false;'
-                '            btn.textContent = "🔄 Регенерировать все файлы";'
+                '            btn.textContent = "🔄 Обновить все файлы";'
                 '        }});'
                 '    }}'
                 '}}'
@@ -912,7 +948,7 @@ class CertificateAdmin(admin.ModelAdmin):
                 '</div>'
             )
         
-        return format_html(result_html)
+        return mark_safe(result_html)
     auditors_certificates_preview.short_description = 'Сертификаты аудиторов'
 
     class Media:
