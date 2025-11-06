@@ -23,7 +23,7 @@ class CertificateForm(forms.ModelForm):
                   'status', 'first_inspection_date', 'first_inspection_status',
                   'second_inspection_date', 'second_inspection_status',
                   'file1', 'file2', 'auditor_certificate', 'client_email', 'notifications_enabled',
-                  'validity_period', 'certification_area', 'qr_code']
+                  'validity_period', 'qr_code']
         widgets = {
             'identifier_type': forms.RadioSelect(),
             'identifier_value': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите номер'}),

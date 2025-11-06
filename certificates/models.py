@@ -83,7 +83,7 @@ class Certificate(models.Model):
     # Оставляем старые поля для обратной совместимости и миграции
     iso_standard = models.ForeignKey(ISOStandard, on_delete=models.SET_NULL, verbose_name='Стандарт ISO (устаревшее)', blank=True, null=True)
     iso_standard_name = models.CharField(max_length=255, verbose_name='Наименование стандарта в сертификате', blank=True)
-    quality_management_system = models.TextField('Настоящий сертификат удостоверяет')
+    quality_management_system = models.TextField('Область сертификации')
     start_date = models.DateField('Дата начала действия')
     expiry_date = models.DateField('Дата окончания действия')
     status = models.CharField('Статус', max_length=20, choices=STATUS_CHOICES, default='active')
@@ -115,7 +115,6 @@ class Certificate(models.Model):
     validity_period = models.IntegerField(choices=[(1, '1 год'), (2, '2 года'), (3, '3 года')], default=1, verbose_name="Срок действия")
     client_email = models.EmailField(blank=True, null=True, verbose_name="Email клиента")
     notifications_enabled = models.BooleanField(default=False, verbose_name="Уведомления подключены")
-    certification_area = models.TextField(verbose_name="Область сертификации")
     qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True, verbose_name='QR-код')
     
     # Автоматически генерируемые изображения сертификатов

@@ -117,15 +117,16 @@ def search_results(request):
         
         parts = search_query.split('.')
         
-        query = Q()
-        
+        # Проверяем правильный формат номера сертификата: SMK.XXXXX.ISO
         if len(parts) == 3 and parts[0].upper() == 'SMK':
-            query |= Q(certificate_number_part__iexact=parts[1])
+            # Точный поиск по номеру сертификата из полного формата
+            query = Q(certificate_number_part__iexact=parts[1])
+        elif search_query.isdigit() and len(search_query) == 5:
+            # Если введено ровно 5 цифр - точный поиск по номеру сертификата
+            query = Q(certificate_number_part__iexact=search_query)
         else:
-            query |= Q(certificate_number_part__icontains=search_query)
-            query |= Q(name__icontains=search_query)
-            query |= Q(identifier_value__icontains=search_query)
-            query |= Q(inn__icontains=search_query)  # Для обратной совместимости
+            # Любой другой запрос - ничего не ищем (убран поиск по ИНН/УНП)
+            query = Q(pk__in=[])  # Пустой результат
         
         certificates = Certificate.objects.filter(query)
         
@@ -148,13 +149,19 @@ def trigger_notifications(request):
 
 def certificate_detail(request, certificate_id):
     certificate = get_object_or_404(Certificate, id=certificate_id)
-    qr_code_url = request.build_absolute_uri(reverse('certificate_detail', args=[certificate_id]))
     
+    # Обновляем статус сертификата
+    current_status = certificate.calculate_status()
+    if certificate.status != current_status:
+        certificate.status = current_status
+        certificate.save(update_fields=['status'])
+    
+    # Используем тот же шаблон, что и для результатов поиска
     context = {
-        'certificate': certificate,
-        'qr_code_url': qr_code_url,
+        'certificates': [certificate],  # Передаем как список для совместимости с шаблоном
+        'search_query': certificate.full_certificate_number,  # Показываем номер сертификата
     }
-    return render(request, 'certificates/certificate_template.html', context)
+    return render(request, 'certificates/search_results.html', context)
 
 def permission_detail(request, certificate_id):
     certificate = get_object_or_404(Certificate, id=certificate_id)

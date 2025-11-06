@@ -27,7 +27,7 @@ def send_single_notification(cert, recipient_type, notification_type, admin_emai
     context = {
         'client_name': cert.name,
         'standard': cert.iso_standard,
-        'certification_area': getattr(cert, 'certification_area', ''),
+        'certification_area': getattr(cert, 'quality_management_system', ''),
         'expiry_date': cert.expiry_date.strftime('%d.%m.%Y'),
         'full_certificate_number': cert.full_certificate_number,
         'start_date': cert.start_date.strftime('%d.%m.%Y'),

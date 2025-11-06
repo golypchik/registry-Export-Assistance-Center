@@ -226,6 +226,103 @@ def draw_iso_standards_column(draw, certificate, x, y, width, height, font, colo
     return total_height
 
 
+def draw_text_with_bold_ending(draw, text_parts, x, y, width, height, font_regular, font_bold, color, align='center', valign='top'):
+    """
+    Рисует текст, где последняя часть жирная
+    
+    text_parts: кортеж (обычный_текст, жирный_текст)
+    Возвращает фактическую высоту отрисованного текста
+    """
+    regular_text, bold_text = text_parts
+    
+    # Объединяем текст для расчета переносов
+    full_text = regular_text + bold_text
+    
+    # Разбиваем на слова
+    words = full_text.split()
+    lines = []
+    current_line = ""
+    current_line_words = []
+    
+    # Определяем, какие слова относятся к жирному тексту
+    bold_words = bold_text.split()
+    bold_start_index = len(words) - len(bold_words)
+    
+    for idx, word in enumerate(words):
+        # Определяем шрифт для текущего слова
+        is_bold = idx >= bold_start_index
+        test_font = font_bold if is_bold else font_regular
+        
+        test_line = current_line + word + " "
+        
+        # Проверяем ширину с учетом шрифтов всех слов в строке
+        test_width = 0
+        temp_words = current_line_words + [(word, is_bold)]
+        for w, is_b in temp_words:
+            f = font_bold if is_b else font_regular
+            bbox = draw.textbbox((0, 0), w + " ", font=f)
+            test_width += bbox[2] - bbox[0]
+        
+        if test_width <= width:
+            current_line = test_line
+            current_line_words.append((word, is_bold))
+        else:
+            if current_line:
+                lines.append(current_line_words)
+                current_line = word + " "
+                current_line_words = [(word, is_bold)]
+            else:
+                # Слово слишком длинное
+                lines.append([(word, is_bold)])
+                current_line = ""
+                current_line_words = []
+    
+    if current_line_words:
+        lines.append(current_line_words)
+    
+    # Вычисляем высоту текста
+    line_height = max(font_regular.size, font_bold.size) + 10
+    total_height = len(lines) * line_height
+    
+    # Определяем начальную позицию Y
+    if valign == 'center':
+        start_y = y + (height - total_height) // 2
+    elif valign == 'bottom':
+        start_y = y + height - total_height
+    else:
+        start_y = y
+    
+    # Рисуем каждую строку
+    current_y = start_y
+    for line_words in lines:
+        # Вычисляем общую ширину строки
+        line_width = 0
+        for word, is_bold in line_words:
+            f = font_bold if is_bold else font_regular
+            bbox = draw.textbbox((0, 0), word + " ", font=f)
+            line_width += bbox[2] - bbox[0]
+        
+        # Определяем начальную позицию X
+        if align == 'center':
+            line_x = x + (width - line_width) // 2
+        elif align == 'right':
+            line_x = x + width - line_width
+        else:
+            line_x = x
+        
+        # Рисуем каждое слово
+        current_x = line_x
+        for word, is_bold in line_words:
+            f = font_bold if is_bold else font_regular
+            draw.text((current_x, current_y), word + " ", font=f, fill=color)
+            bbox = draw.textbbox((0, 0), word + " ", font=f)
+            current_x += bbox[2] - bbox[0]
+        
+        current_y += line_height
+    
+    return total_height
+
+
 def get_background_path(filename):
     """Получает путь к файлу фона"""
     return os.path.join(settings.BASE_DIR, 'templates', 'background', filename)
@@ -357,23 +454,6 @@ def generate_main_certificate(certificate, with_signatures=False):
         draw_text_in_box(draw, certificate.address, 340, y3, 2012, 300, 
                          font, color, align='center', valign='top')
         
-        # 4. ISO стандарты (может быть несколько, отображаются столбиком)
-        font = get_font(63, bold=True)
-        draw_iso_standards_column(draw, certificate, 340, 2320, 2012, 300, 
-                                 font, color, align='center', valign='top')
-        
-        # 5. Дата начала
-        font = get_font(63, bold=False)
-        color = hex_to_rgb('851814')
-        start_date = format_date(certificate.start_date)
-        draw_text_in_box(draw, start_date, 1380, 2740, 341, 72, 
-                         font, color, align='center', valign='top')
-        
-        # 6. Дата окончания
-        expiry_date = format_date(certificate.expiry_date)
-        draw_text_in_box(draw, expiry_date, 2007, 2740, 341, 72, 
-                         font, color, align='center', valign='top')
-        
         # 7. QR код
         if certificate.qr_code and os.path.exists(certificate.qr_code.path):
             qr = Image.open(certificate.qr_code.path)
@@ -382,11 +462,88 @@ def generate_main_certificate(certificate, with_signatures=False):
             qr = qr.resize(new_size, Image.Resampling.LANCZOS)
             bg.paste(qr, (2053, 756), qr if qr.mode == 'RGBA' else None)
         
-        # 10. Текст того, что удостоверяет сертификат
+        # === НОВАЯ СТРУКТУРА С ДИНАМИЧЕСКИМ ПОЗИЦИОНИРОВАНИЕМ ===
+        
+        # 4. Область сертификации (качество управления системы)
         font = get_font(43, bold=False)
         color = hex_to_rgb('000000')
-        draw_text_in_box(draw, certificate.quality_management_system, 340, 1900, 2012, 350, 
-                         font, color, align='center', valign='center')
+        certification_area_y = 1950
+        certification_area_height = draw_text_in_box(
+            draw, certificate.quality_management_system, 
+            340, certification_area_y, 2012, 1000,  # Даем большую высоту для динамического переноса
+            font, color, align='center', valign='top'
+        )
+        logger.info(f"Область сертификации: y={certification_area_y}, высота={certification_area_height}")
+        
+        # 5. Текст "Соответствует требованиям" (через 60px после области сертификации)
+        font = get_font(75, bold=True)
+        color = hex_to_rgb('851814')
+        complies_y = certification_area_y + certification_area_height + 50
+        complies_height = draw_text_in_box(
+            draw, "Соответствует требованиям",
+            816, complies_y, 1062, 200,
+            font, color, align='center', valign='top'
+        )
+        logger.info(f"Текст 'Соответствует требованиям': y={complies_y}, высота={complies_height}")
+        
+        # 6. ISO стандарты (через 60px после "Соответствует требованиям")
+        font = get_font(63, bold=True)
+        color = hex_to_rgb('000000')
+        iso_standards_y = complies_y + complies_height + 50
+        iso_standards_height = draw_iso_standards_column(
+            draw, certificate, 
+            340, iso_standards_y, 2012, 500,  # Даем большую высоту для переноса
+            font, color, align='center', valign='top'
+        )
+        logger.info(f"ISO стандарты: y={iso_standards_y}, высота={iso_standards_height}")
+        
+        # 7. Блок дат с динамическим смещением
+        # Базовые координаты блока дат (для заголовков)
+        base_dates_y = 2684
+        
+        # Вычисляем смещение: если ISO стандарты ниже 2400, сдвигаем блок дат
+        # Максимальное смещение - 200 пикселей
+        dates_offset = 0
+        if iso_standards_y > 2400:
+            dates_offset = min(200, iso_standards_y - 2400)
+        
+        dates_y = base_dates_y + dates_offset
+        logger.info(f"Блок дат: базовый y={base_dates_y}, смещение={dates_offset}, итоговый y={dates_y}")
+        
+        # 7a. Текст "Дата регистрации"
+        font = get_font(42, bold=False)
+        color = hex_to_rgb('000000')
+        draw_text_in_box(
+            draw, "Дата регистрации",
+            1398, dates_y, 340, 72,
+            font, color, align='center', valign='top'
+        )
+        
+        # 7b. Текст "Срок действия до:"
+        draw_text_in_box(
+            draw, "Срок действия до:",
+            2027, dates_y, 340, 72,
+            font, color, align='center', valign='top'
+        )
+        
+        # 7c. Дата начала (под текстом "Дата регистрации", поднята на 10px выше)
+        font = get_font(63, bold=False)
+        color = hex_to_rgb('851814')
+        start_date = format_date(certificate.start_date)
+        start_date_y = dates_y + 50  # Отступ от заголовка (было 70, стало 60)
+        draw_text_in_box(
+            draw, start_date, 
+            1380, start_date_y, 341, 72,
+            font, color, align='center', valign='top'
+        )
+        
+        # 7d. Дата окончания (под текстом "Срок действия до:")
+        expiry_date = format_date(certificate.expiry_date)
+        draw_text_in_box(
+            draw, expiry_date, 
+            2007, start_date_y, 341, 72,
+            font, color, align='center', valign='top'
+        )
         
         # Добавляем подписи и печать, если требуется
         if with_signatures:
@@ -470,11 +627,15 @@ def generate_permission_certificate(certificate, with_signatures=False):
             qr = qr.resize(new_size, Image.Resampling.LANCZOS)
             bg.paste(qr, (2053, 756), qr if qr.mode == 'RGBA' else None)
         
-        # 10. Текст разрешения
-        font = get_font(43, bold=False)
-        permission_text = f"использование знака соответствия системы менеджмента на период действия сертификата {certificate.full_certificate_number}"
-        draw_text_in_box(draw, permission_text, 300, 2060, 2092, 350, 
-                         font, color, align='center', valign='top')
+        # 10. Текст разрешения (с жирным номером сертификата)
+        font_regular = get_font(43, bold=False)
+        font_bold = get_font(43, bold=True)
+        permission_text_parts = (
+            "использование знака соответствия системы менеджмента на период действия сертификата ",
+            certificate.full_certificate_number
+        )
+        draw_text_with_bold_ending(draw, permission_text_parts, 300, 2060, 2092, 350, 
+                                   font_regular, font_bold, color, align='center', valign='top')
         
         # Добавляем подписи и печать, если требуется
         if with_signatures:

@@ -87,7 +87,7 @@ class CertificateAdmin(admin.ModelAdmin):
         }),
         ('Информация о сертификате', {
             'fields': ('certificate_number_part', 'quality_management_system', 
-                      'start_date', 'expiry_date', 'status', 'validity_period', 'certification_area'),
+                      'start_date', 'expiry_date', 'status', 'validity_period'),
             'description': 'Стандарты ISO добавляются в секции "Стандарты ISO" ниже'
         }),
         ('Инспекционный контроль', {
@@ -433,7 +433,6 @@ class CertificateAdmin(admin.ModelAdmin):
                                 'validity_period': duplicate_data.get('validity_period'),
                                 'client_email': duplicate_data.get('client_email'),
                                 'notifications_enabled': duplicate_data.get('notifications_enabled'),
-                                'certification_area': duplicate_data.get('certification_area'),
                             })
                             logger.info("Форма предзаполнена данными дублирования")
                 
@@ -501,7 +500,6 @@ class CertificateAdmin(admin.ModelAdmin):
                     'validity_period': original_certificate.validity_period,
                     'client_email': original_certificate.client_email,
                     'notifications_enabled': original_certificate.notifications_enabled,
-                    'certification_area': original_certificate.certification_area,
                     'auditors': auditors_data,
                     'iso_standards': iso_standards_data,
                 }
