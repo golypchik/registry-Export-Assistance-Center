@@ -204,12 +204,15 @@ def compress_image(image_file, max_size_mb=1, quality=85):
         else:
             image = Image.open(image_file)
         
-        # Конвертируем в RGB если нужно (для JPEG)
-        if image.mode not in ('RGB', 'RGBA'):
-            if image.mode == 'P' and 'transparency' in image.info:
-                image = image.convert('RGBA')
-            else:
-                image = image.convert('RGB')
+        # Всегда конвертируем в RGB для JPEG (без поддержки прозрачности)
+        # Это обеспечивает быструю и эффективную компрессию
+        if image.mode == 'RGBA':
+            # Создаем белый фон для прозрачных областей
+            background = Image.new('RGB', image.size, (255, 255, 255))
+            background.paste(image, mask=image.split()[3])  # 3 - альфа канал
+            image = background
+        elif image.mode != 'RGB':
+            image = image.convert('RGB')
         
         # Начальные параметры
         current_quality = quality
@@ -226,18 +229,12 @@ def compress_image(image_file, max_size_mb=1, quality=85):
             else:
                 scaled_image = image
             
-            # Сжимаем с текущим качеством
+            # Сжимаем с текущим качеством в JPEG
             buffer = BytesIO()
-            
-            # Определяем формат сохранения
             format_name = 'JPEG'
             save_kwargs = {'format': format_name, 'quality': current_quality, 'optimize': True}
             
-            # Для изображений с прозрачностью используем PNG
-            if scaled_image.mode == 'RGBA':
-                format_name = 'PNG'
-                save_kwargs = {'format': format_name, 'optimize': True}
-            
+            # Сохраняем изображение
             scaled_image.save(buffer, **save_kwargs)
             compressed_size = buffer.tell()
             
@@ -255,19 +252,16 @@ def compress_image(image_file, max_size_mb=1, quality=85):
                 scale_factor = max(0.5, scale_factor - 0.1)
         
         if compressed_data:
-            # Определяем расширение файла
-            extension = '.jpg' if format_name == 'JPEG' else '.png'
-            
-            # Создаем ContentFile
+            # Создаем ContentFile с расширением .jpg
             compressed_file = ContentFile(compressed_data)
             
-            # Оригинальное имя файла
+            # Оригинальное имя файла (всегда с расширением .jpg)
             original_name = getattr(image_file, 'name', 'compressed_image')
             if hasattr(image_file, 'name') and image_file.name:
                 name_parts = os.path.splitext(image_file.name)
-                compressed_name = f"{name_parts[0]}_compressed{extension}"
+                compressed_name = f"{name_parts[0]}_compressed.jpg"
             else:
-                compressed_name = f"compressed_image{extension}"
+                compressed_name = "compressed_image.jpg"
             
             compressed_file.name = compressed_name
             
