@@ -34,12 +34,11 @@ class CertificateISOStandardInline(admin.TabularInline):
 class AuditorInline(admin.TabularInline):
     model = Auditor
     extra = 1
-    fields = ('full_name', 'audit_file', 'audit_file_preview')
-    readonly_fields = ('audit_file_preview',)
-
-    def audit_file_preview(self, instance):
-        return get_file_preview(instance.audit_file)
-    audit_file_preview.short_description = "Предпросмотр файла аудита"
+    fields = (
+        'full_name',
+        'uploaded_audit',
+        'uploaded_audit_signed',
+    )
 
 class CertificateAdminForm(forms.ModelForm):
     class Meta:
