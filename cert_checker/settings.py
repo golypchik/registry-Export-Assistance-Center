@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 from decouple import config
-import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -10,15 +9,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-your-secret-key-here-change-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 # Разрешенные хосты для Render
-ALLOWED_HOSTS = ['*']  # Для Render можно использовать *
+ALLOWED_HOSTS = [
+    'register-eqs.export-center.ru',
+    'www.register-eqs.export-center.ru',
+    'localhost',
+    '127.0.0.1'
+]
 
 # Render.com specific
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
-    ALLOWED_HOSTS = [RENDER_EXTERNAL_HOSTNAME, 'localhost', '127.0.0.1']
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 # Site URL for QR code generation
 SITE_URL = os.environ.get('SITE_URL', 'https://export-center.ru')
